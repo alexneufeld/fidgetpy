@@ -1,0 +1,22 @@
+[project]
+name = "fidgetpy"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Alex Neufeld", email = "alex.d.neufeld@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+fidgetpy = "fidgetpy:main"
+
+[tool.maturin]
+module-name = "fidgetpy._core"
+python-packages = ["fidgetpy"]
+python-source = "src"
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
