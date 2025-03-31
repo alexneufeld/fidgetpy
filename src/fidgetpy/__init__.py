@@ -36,5 +36,5 @@
 #
 # __all__ = ["OpCode"]
 from fidgetpy._core import PyTree as Tree
-from fidgetpy._core import Foo
-__all__ = ["Tree", "Foo"]
+from fidgetpy._core import do_something_with_nodechoice
+__all__ = ["Tree", "do_something_with_nodechoice"]

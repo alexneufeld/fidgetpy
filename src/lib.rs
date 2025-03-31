@@ -1,78 +1,41 @@
 use fidget::context::{Context, Tree};
 use pyo3::prelude::*;
 
-
+#[derive(Clone)]
 #[pyclass]
 struct PyTree {
     _val: Tree,
 }
 
-impl<'py> FromPyObject<'py> for PyTree {
+
+#[pyclass]
+enum NodeChoice {
+    Node(PyTree),
+    Constant(f64)
+}
+
+
+impl<'py> FromPyObject<'py> for NodeChoice {
     // convert python ints and floats to PyTrees implicitly
     fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
         if obj.is_instance_of::<PyTree>() {
-           //Ok(obj.unbind().)
-            Ok(PyTree {
-            _val: Tree::constant(5.0),
-        })
+            let x = PyTree::extract_bound(obj)?;
+            Ok(NodeChoice::Node(x))
         }
-        else {let value: f64 = obj.extract()?;
-        Ok(PyTree {
-            _val: Tree::constant(value),
-        })}
+        else {
+            let value: f64 = obj.extract()?;
+            Ok(NodeChoice::Constant(value))
+        }
     }
 }
 
-// fn implicit_cast(obj: &PyAny) -> PyResult<PyTree> {
-//     if PyAny::is_type_of_bound()
-//     let val: f64 = obj.into()
-//     let value: f64 = obj.extract()?;
-//         Ok(PyTree {
-//             _val: Tree::constant(value),
-//         })
-// }
-
-
-#[derive(Clone)]
-#[pyclass]
-struct Foo(i64);
-
-#[pyclass]
-struct IntoFoo(Foo);
-
-impl Into<Foo> for IntoFoo {
-    fn into(self) -> Foo {
-        self.0
-    }
-
-}
-
-// If I remove this it compiles, but calling in Python: `>>> recive_from_int(42)`
-// causes this error: `TypeError: argument 'foo': 'int' object cannot be converted to 'Foo'`
-impl<'py> FromPyObject<'py> for IntoFoo {
-
-    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
-        let value: Foo = obj.extract()?;
-        Ok(IntoFoo(value))
+#[pyfunction]
+fn do_something_with_nodechoice(thing: &NodeChoice) -> PyTree {
+    match thing {
+        NodeChoice::Node(tree) => tree.to_owned(),
+        NodeChoice::Constant(val) => PyTree { _val: Tree::constant(*val) }
     }
 }
-
-
-#[pymethods]
-impl Foo {
-    #[new]
-    fn new(v: i64) -> Self {
-        Foo(v)
-    }
-    #[staticmethod]
-    fn receive_foo_from_int(foo: Foo) -> PyResult<i64> {
-        Ok(foo.0)
-    }
-
-}
-
-
-
 
 
 #[pymethods]
@@ -204,10 +167,7 @@ impl PyTree {
         }
     }
     // binary operations
-    fn myadd<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<PyTree> {
-        let extracted= PyTree::extract_bound(other)?;
-        Ok(PyTree { _val: self._val.to_owned() + extracted._val.to_owned()})
-    }
+
     fn add(&self, other: &PyTree) -> Self {
         PyTree {
             _val: self._val.to_owned() + other._val.to_owned(),
@@ -322,8 +282,8 @@ impl PyTree {
 /// import the module.
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    // m.add_function(wrap_pyfunction!(receive_foo_from_int, m)?)?;
-    m.add_class::<Foo>()?;
+    m.add_function(wrap_pyfunction!(do_something_with_nodechoice, m)?)?;
+    // m.add_class::<Foo>()?;
     m.add_class::<PyTree>()?;
     Ok(())
 }
