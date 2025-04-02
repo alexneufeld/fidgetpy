@@ -1,40 +1,65 @@
-# from fidgetpy._core import PyUnaryOpCode as uop
-# from fidgetpy._core import PyBinaryOpCode as bop
-#
-# class Opcode:
-#     # unary
-#     ABS = uop("abs")
-#     ACOS = uop("acos")
-#     ASIN = uop("asin")
-#     ATAN = uop("atan")
-#     CEIL = uop("ceil")
-#     COS =uop("cos")
-#     EXP =uop("exp")
-#     FLOOR = uop("floor")
-#     LN =uop("ln")
-#     NEG = uop("neg")
-#     NOT = uop("not")
-#     RECIP = uop("recip")
-#     ROUND = uop("round")
-#     SIN =uop("sin")
-#     SQRT = uop("sqrt")
-#     SQUARE = uop("square")
-#     TAN =uop("tan")
-#     # binary
-#     ADD = bop("add")
-#     SUB = bop("sub")
-#     MUL = bop("mul")
-#     DIV = bop("div")
-#     ATAN2 = bop("atan2")
-#     MIN = bop("min")
-#     MAX = bop("max")
-#     COMPARE = bop("compare")
-#     MOD = bop("mod")
-#     AND = bop("and")
-#     OR = bop("or")
-#
-#
-# __all__ = ["OpCode"]
-from fidgetpy._core import PyTree as Tree
-from fidgetpy._core import do_something_with_nodechoice
-__all__ = ["Tree", "do_something_with_nodechoice"]
+from fidgetpy._core import Tree
+from fidgetpy._core import Mesh
+from .vec import Vec2, Vec3, Vec4, axis, axis2d
+from .vmath import (
+    sqrt,
+    sin,
+    cos,
+    tan,
+    asin,
+    acos,
+    atan,
+    ln,
+    exp,
+    abs_,
+    round_,
+    lt,
+    le,
+    not_,
+    sum_,
+    length,
+    max_,
+    min_,
+    atan2,
+    compare,
+    and_,
+    clamp,
+    smoothstep,
+    mix,
+)
+
+__all__ = [
+    "Tree",
+    "Mesh",
+    "Vec3",
+    "Vec4",
+    "Vec2",
+    "axis",
+    "axis2d",
+    "sqrt",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "ln",
+    "exp",
+    "abs_",
+    "round_",
+    "not_",
+    "lt",
+    "le",
+    "and_",
+    "not_",
+    "sum_",
+    "length",
+    "max_",
+    "min_",
+    "atan2",
+    "compare",
+    "and_",
+    "clamp",
+    "smoothstep",
+    "mix",
+]
