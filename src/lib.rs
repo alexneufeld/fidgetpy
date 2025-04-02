@@ -108,14 +108,25 @@ impl PyTree {
         ctx.import(&self._val);
         ctx.len()
     }
-    fn remap_xyz(&self, new_x: &PyTree, new_y: &PyTree, new_z: &PyTree) -> Self {
-        PyTree {
-            _val: self._val.to_owned().remap_xyz(
-                new_x._val.to_owned(),
-                new_y._val.to_owned(),
-                new_z._val.to_owned(),
-            ),
-        }
+    fn remap_xyz(
+        &self,
+        new_x: &PyTree,
+        new_y: &PyTree,
+        new_z: &PyTree,
+    ) -> Result<Self, PyFidgetError> {
+        // don't lazily evaluate remappings to prevent unexpected results due to nested remap calls
+        let remapped_tree = self._val.to_owned().remap_xyz(
+            new_x._val.to_owned(),
+            new_y._val.to_owned(),
+            new_z._val.to_owned(),
+        );
+        let mut ctx = Context::new();
+        let root = ctx.import(&remapped_tree);
+        // let root = ctx.import(&self._val);
+        // root.remap_xyz();
+        Ok(PyTree {
+            _val: ctx.export(root)?,
+        })
     }
     // axis words and constants
     #[staticmethod]
@@ -223,7 +234,7 @@ impl PyTree {
         }
     }
     // binary operations
-    fn pow<'py>(&self, other: &Bound<'py, PyAny>) ->PyResult<Self> {
+    fn pow<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
         // https://en.wikipedia.org/wiki/Exponentiation_by_squaring
         let mut n: i64 = other.extract()?;
         let mut res = self._val.to_owned();
@@ -232,15 +243,16 @@ impl PyTree {
         if n < 0 {
             n = -n;
             res = Tree::constant(1.0) / res;
-        }
-        else if n == 0 {
-            return Ok(PyTree { _val: Tree::constant(1.0)});
+        } else if n == 0 {
+            return Ok(PyTree {
+                _val: Tree::constant(1.0),
+            });
         }
         while n > 1 {
             if n % 2 == 1 {
                 if first_y_mul {
                     y = res.clone() * y;
-                } else  {
+                } else {
                     y = res.clone();
                     first_y_mul = true;
                 }
@@ -477,10 +489,14 @@ impl PyTree {
             })
         }
     }
-    fn __pow__<'py>(&self, other: &Bound<'py, PyAny>, modval: Option<&Bound<'py, PyAny>>) -> PyResult<Self> {
+    fn __pow__<'py>(
+        &self,
+        other: &Bound<'py, PyAny>,
+        modval: Option<&Bound<'py, PyAny>>,
+    ) -> PyResult<Self> {
         match modval {
-        Some(_) => Err(PyRuntimeError::new_err("mod option not available for Tree")),
-        None => Ok(PyTree::pow(&self, &other)?)
+            Some(_) => Err(PyRuntimeError::new_err("mod option not available for Tree")),
+            None => Ok(PyTree::pow(&self, &other)?),
         }
     }
 }
