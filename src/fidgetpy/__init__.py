@@ -27,6 +27,7 @@ from .vmath import (
     smoothstep,
     mix,
 )
+from .bop import union, fuse, intersection, common, difference, cut, xor
 
 __all__ = [
     "Tree",
@@ -62,4 +63,11 @@ __all__ = [
     "clamp",
     "smoothstep",
     "mix",
+    "union",
+    "fuse",
+    "intersection",
+    "common",
+    "difference",
+    "cut",
+    "xor",
 ]

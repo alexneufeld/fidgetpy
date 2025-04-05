@@ -1,8 +1,11 @@
-use fidget::context::{Context, Tree};
-use fidget::mesh::{Mesh, Settings};
+use fidget::{
+    compiler::{SsaOp, SsaTape},
+    context::{Context, Tree},
+    mesh::{Mesh, Settings},
+};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashMap};
 
 struct PyFidgetError(fidget::Error);
 
@@ -85,6 +88,246 @@ impl PyTree {
         let mut ctx = Context::new();
         ctx.import(&self._val);
         ctx.dot()
+    }
+    #[staticmethod]
+    fn from_vm(src: &str) -> Result<Self, PyFidgetError> {
+        let (ctx, root) = Context::from_text(src.as_bytes())?;
+        Ok(PyTree {
+            _val: ctx.export(root)?,
+        })
+    }
+    fn to_vm(&self) -> Result<String, PyFidgetError> {
+        let mut ctx = Context::new();
+        let root = ctx.import(&self._val);
+        let (ssatape, _) = SsaTape::new(&ctx, &[root])?;
+        let mut result = String::new();
+        let mut addr: u32 = 0;
+        let mut regmap = HashMap::<u32, u32>::new();
+        let mut constmap = HashMap::<[u8; 4], u32>::new();
+        for &op in ssatape.tape.iter().rev() {
+            match op {
+                SsaOp::Output(..) => {}
+                SsaOp::Input(out, i) => {
+                    let varname = match i {
+                        0 => "var-x",
+                        1 => "var-y",
+                        2 => "var-z",
+                        _ => unreachable!(),
+                    };
+                    result.push_str(&format!("${addr} {varname}\n"));
+                    regmap.insert(out, addr);
+                    addr += 1;
+                }
+                SsaOp::NegReg(out, arg)
+                | SsaOp::AbsReg(out, arg)
+                | SsaOp::RecipReg(out, arg)
+                | SsaOp::SqrtReg(out, arg)
+                | SsaOp::CopyReg(out, arg)
+                | SsaOp::SquareReg(out, arg)
+                | SsaOp::FloorReg(out, arg)
+                | SsaOp::CeilReg(out, arg)
+                | SsaOp::RoundReg(out, arg)
+                | SsaOp::SinReg(out, arg)
+                | SsaOp::CosReg(out, arg)
+                | SsaOp::TanReg(out, arg)
+                | SsaOp::AsinReg(out, arg)
+                | SsaOp::AcosReg(out, arg)
+                | SsaOp::AtanReg(out, arg)
+                | SsaOp::ExpReg(out, arg)
+                | SsaOp::LnReg(out, arg)
+                | SsaOp::NotReg(out, arg) => {
+                    let op = match op {
+                        SsaOp::NegReg(..) => "neg",
+                        SsaOp::AbsReg(..) => "abs",
+                        SsaOp::RecipReg(..) => "recip",
+                        SsaOp::SqrtReg(..) => "sqrt",
+                        SsaOp::SquareReg(..) => "square",
+                        SsaOp::FloorReg(..) => "floor",
+                        SsaOp::CeilReg(..) => "ceil",
+                        SsaOp::RoundReg(..) => "round",
+                        SsaOp::SinReg(..) => "sin",
+                        SsaOp::CosReg(..) => "cos",
+                        SsaOp::TanReg(..) => "tan",
+                        SsaOp::AsinReg(..) => "asin",
+                        SsaOp::AcosReg(..) => "acos",
+                        SsaOp::AtanReg(..) => "atan",
+                        SsaOp::ExpReg(..) => "exp",
+                        SsaOp::LnReg(..) => "ln",
+                        SsaOp::NotReg(..) => "not",
+                        SsaOp::CopyReg(..) => "copy",
+                        _ => unreachable!(),
+                    };
+                    let arg_addr = match regmap.get(&arg) {
+                        Some(x) => x,
+                        None => unreachable!(),
+                    };
+                    result.push_str(&format!("${addr} {op} ${arg_addr}\n"));
+                    regmap.insert(out, addr);
+                    addr += 1;
+                }
+
+                SsaOp::AddRegReg(out, lhs, rhs)
+                | SsaOp::MulRegReg(out, lhs, rhs)
+                | SsaOp::DivRegReg(out, lhs, rhs)
+                | SsaOp::SubRegReg(out, lhs, rhs)
+                | SsaOp::MinRegReg(out, lhs, rhs)
+                | SsaOp::MaxRegReg(out, lhs, rhs)
+                | SsaOp::ModRegReg(out, lhs, rhs)
+                | SsaOp::AndRegReg(out, lhs, rhs)
+                | SsaOp::AtanRegReg(out, lhs, rhs)
+                | SsaOp::OrRegReg(out, lhs, rhs) => {
+                    let op = match op {
+                        SsaOp::AddRegReg(..) => "add",
+                        SsaOp::MulRegReg(..) => "mul",
+                        SsaOp::DivRegReg(..) => "div",
+                        SsaOp::AtanRegReg(..) => "atan",
+                        SsaOp::SubRegReg(..) => "sub",
+                        SsaOp::MinRegReg(..) => "min",
+                        SsaOp::MaxRegReg(..) => "max",
+                        SsaOp::ModRegReg(..) => "max",
+                        SsaOp::AndRegReg(..) => "and",
+                        SsaOp::OrRegReg(..) => "or",
+                        _ => unreachable!(),
+                    };
+                    let lhs_addr = match regmap.get(&lhs) {
+                        Some(x) => x,
+                        None => unreachable!(),
+                    };
+                    let rhs_addr = match regmap.get(&rhs) {
+                        Some(x) => x,
+                        None => unreachable!(),
+                    };
+                    result.push_str(&format!("${addr} {op} ${lhs_addr} ${rhs_addr}\n"));
+                    regmap.insert(out, addr);
+                    addr += 1;
+                }
+
+                SsaOp::AddRegImm(out, arg, imm)
+                | SsaOp::MulRegImm(out, arg, imm)
+                | SsaOp::DivRegImm(out, arg, imm)
+                | SsaOp::DivImmReg(out, arg, imm)
+                | SsaOp::SubImmReg(out, arg, imm)
+                | SsaOp::SubRegImm(out, arg, imm)
+                | SsaOp::AtanRegImm(out, arg, imm)
+                | SsaOp::AtanImmReg(out, arg, imm)
+                | SsaOp::MinRegImm(out, arg, imm)
+                | SsaOp::MaxRegImm(out, arg, imm)
+                | SsaOp::ModRegImm(out, arg, imm)
+                | SsaOp::ModImmReg(out, arg, imm)
+                | SsaOp::AndRegImm(out, arg, imm)
+                | SsaOp::OrRegImm(out, arg, imm) => {
+                    let (op, swap) = match op {
+                        SsaOp::AddRegImm(..) => ("add", false),
+                        SsaOp::MulRegImm(..) => ("mul", false),
+                        SsaOp::DivImmReg(..) => ("div", true),
+                        SsaOp::DivRegImm(..) => ("div", false),
+                        SsaOp::SubImmReg(..) => ("sub", true),
+                        SsaOp::SubRegImm(..) => ("sub", false),
+                        SsaOp::AtanImmReg(..) => ("atan", true),
+                        SsaOp::AtanRegImm(..) => ("atan", false),
+                        SsaOp::MinRegImm(..) => ("min", false),
+                        SsaOp::MaxRegImm(..) => ("max", false),
+                        SsaOp::ModRegImm(..) => ("mod", false),
+                        SsaOp::ModImmReg(..) => ("mod", true),
+                        SsaOp::AndRegImm(..) => ("and", false),
+                        SsaOp::OrRegImm(..) => ("or", false),
+                        _ => unreachable!(),
+                    };
+                    let imm_addr = if let std::collections::hash_map::Entry::Vacant(e) =
+                        constmap.entry(imm.to_ne_bytes())
+                    {
+                        e.insert(addr);
+                        result.push_str(&format!("${addr} const {imm}\n"));
+                        addr += 1;
+                        addr - 1
+                    } else {
+                        *match constmap.get(&imm.to_ne_bytes()) {
+                            Some(x) => x,
+                            None => unreachable!(),
+                        }
+                    };
+                    let arg_addr = match regmap.get(&arg) {
+                        Some(x) => x,
+                        None => unreachable!(),
+                    };
+                    if swap {
+                        result.push_str(&format!("${addr} {op} ${imm_addr} ${arg_addr}\n"));
+                    } else {
+                        result.push_str(&format!("${addr} {op} ${arg_addr} ${imm_addr}\n"));
+                    }
+                    regmap.insert(out, addr);
+                    addr += 1;
+                }
+                SsaOp::CompareRegReg(out, lhs, rhs) => {
+                    let lhs_addr = match regmap.get(&lhs) {
+                        Some(x) => x,
+                        None => unreachable!(),
+                    };
+                    let rhs_addr = match regmap.get(&rhs) {
+                        Some(x) => x,
+                        None => unreachable!(),
+                    };
+                    result.push_str(&format!("${addr} compare ${lhs_addr} ${rhs_addr}\n"));
+                    regmap.insert(out, addr);
+                    addr += 1;
+                }
+                SsaOp::CompareRegImm(out, arg, imm) => {
+                    let imm_addr = if let std::collections::hash_map::Entry::Vacant(e) =
+                        constmap.entry(imm.to_ne_bytes())
+                    {
+                        e.insert(addr);
+                        result.push_str(&format!("${addr} const {imm}\n"));
+                        addr += 1;
+                        addr - 1
+                    } else {
+                        *match constmap.get(&imm.to_ne_bytes()) {
+                            Some(x) => x,
+                            None => unreachable!(),
+                        }
+                    };
+                    let arg_addr = match regmap.get(&arg) {
+                        Some(x) => x,
+                        None => unreachable!(),
+                    };
+                    result.push_str(&format!("${addr} compare ${arg_addr} ${imm_addr}\n"));
+                    regmap.insert(out, addr);
+                    addr += 1;
+                }
+                SsaOp::CompareImmReg(out, arg, imm) => {
+                    let imm_addr = if let std::collections::hash_map::Entry::Vacant(e) =
+                        constmap.entry(imm.to_ne_bytes())
+                    {
+                        e.insert(addr);
+                        result.push_str(&format!("${addr} const {imm}\n"));
+                        addr += 1;
+                        addr - 1
+                    } else {
+                        *match constmap.get(&imm.to_ne_bytes()) {
+                            Some(x) => x,
+                            None => unreachable!(),
+                        }
+                    };
+                    let arg_addr = match regmap.get(&arg) {
+                        Some(x) => x,
+                        None => unreachable!(),
+                    };
+                    result.push_str(&format!("${addr} compare ${imm_addr} ${arg_addr}\n"));
+                    regmap.insert(out, addr);
+                    addr += 1;
+                }
+                SsaOp::CopyImm(_out, imm) => {
+                    // result.push_str(&format!("${out} copy {imm}\n"));
+                    if let std::collections::hash_map::Entry::Vacant(e) =
+                        constmap.entry(imm.to_ne_bytes())
+                    {
+                        e.insert(addr);
+                        result.push_str(&format!("${addr} const {imm}\n"));
+                        addr += 1;
+                    }
+                }
+            }
+        }
+        Ok(result)
     }
     fn mesh(&self, this_depth: u8) -> Result<PyMesh, PyFidgetError> {
         let mut ctx = Context::new();

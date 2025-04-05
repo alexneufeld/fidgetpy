@@ -58,7 +58,7 @@ class BoundBox:
         return (self._max + self._min)/2
 
     @property
-    def diagonal_length -> Real:
+    def diagonal_length(self) -> Real:
         return (self._max - self._min).length()
 
 
@@ -72,7 +72,7 @@ class Shape:
         return self._boundbox
 
 
-def sphere(r = 1.0) -> Shape
+def sphere(r = 1.0) -> Shape:
     return Shape(
         axis().length - r,
         BoundBox(-r, -r, -r, r, r, r)
