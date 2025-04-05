@@ -1,8 +1,8 @@
-use std::cmp::Ordering;
 use fidget::context::{Context, Tree};
 use fidget::mesh::{Mesh, Settings};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
+use std::cmp::Ordering;
 
 struct PyFidgetError(fidget::Error);
 
@@ -242,9 +242,16 @@ impl PyTree {
         let mut y: Tree = Tree::constant(1.0);
         let mut first_y_mul = false;
         match n.cmp(&0) {
-            Ordering::Less => {n = -n; res = Tree::constant(1.0) / res;},
-            Ordering::Equal => {return Ok(PyTree {_val: Tree::constant(1.0),});},
-            Ordering::Greater => {},
+            Ordering::Less => {
+                n = -n;
+                res = Tree::constant(1.0) / res;
+            }
+            Ordering::Equal => {
+                return Ok(PyTree {
+                    _val: Tree::constant(1.0),
+                });
+            }
+            Ordering::Greater => {}
         }
         while n > 1 {
             if n % 2 == 1 {
