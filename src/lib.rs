@@ -234,7 +234,7 @@ impl PyTree {
         }
     }
     // binary operations
-    fn pow<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn pow(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         // https://en.wikipedia.org/wiki/Exponentiation_by_squaring
         let mut n: i64 = other.extract()?;
         let mut res = self._val.to_owned();
@@ -256,10 +256,10 @@ impl PyTree {
                     y = res.clone();
                     first_y_mul = true;
                 }
-                n = n - 1;
+                n -= 1;
             }
             res = res.clone().square();
-            n = n / 2;
+            n /= 2;
         }
         if first_y_mul {
             Ok(PyTree { _val: res * y })
@@ -267,7 +267,7 @@ impl PyTree {
             Ok(PyTree { _val: res })
         }
     }
-    fn add<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn add(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -280,7 +280,7 @@ impl PyTree {
             })
         }
     }
-    fn sub<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn sub(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -293,7 +293,7 @@ impl PyTree {
             })
         }
     }
-    fn mul<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn mul(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -306,7 +306,7 @@ impl PyTree {
             })
         }
     }
-    fn div<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn div(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -319,7 +319,7 @@ impl PyTree {
             })
         }
     }
-    fn max<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn max(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -332,7 +332,7 @@ impl PyTree {
             })
         }
     }
-    fn min<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn min(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -345,7 +345,7 @@ impl PyTree {
             })
         }
     }
-    fn compare<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn compare(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -358,7 +358,7 @@ impl PyTree {
             })
         }
     }
-    fn modulo<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn modulo(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -371,7 +371,7 @@ impl PyTree {
             })
         }
     }
-    fn and<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn and(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -384,7 +384,7 @@ impl PyTree {
             })
         }
     }
-    fn or<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn or(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -397,7 +397,7 @@ impl PyTree {
             })
         }
     }
-    fn atan2<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn atan2(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -420,25 +420,25 @@ impl PyTree {
     fn __invert__(&self) -> Self {
         PyTree::neg(self)
     }
-    fn __or__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
-        PyTree::or(&self, &other)
+    fn __or__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        PyTree::or(self, other)
     }
-    fn __and__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
-        PyTree::and(&self, &other)
+    fn __and__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        PyTree::and(self, other)
     }
     fn __abs__(&self) -> Self {
         PyTree::abs(self)
     }
-    fn __add__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
-        PyTree::add(&self, &other)
+    fn __add__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        PyTree::add(self, other)
     }
-    fn __radd__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
-        PyTree::add(&self, &other)
+    fn __radd__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        PyTree::add(self, other)
     }
-    fn __sub__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
-        PyTree::sub(&self, &other)
+    fn __sub__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        PyTree::sub(self, other)
     }
-    fn __rsub__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn __rsub__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -451,16 +451,16 @@ impl PyTree {
             })
         }
     }
-    fn __mul__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
-        PyTree::mul(&self, &other)
+    fn __mul__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        PyTree::mul(self, other)
     }
-    fn __rmul__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
-        PyTree::mul(&self, &other)
+    fn __rmul__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        PyTree::mul(self, other)
     }
-    fn __truediv__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
-        PyTree::div(&self, &other)
+    fn __truediv__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        PyTree::div(self, other)
     }
-    fn __rtruediv__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn __rtruediv__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -473,10 +473,10 @@ impl PyTree {
             })
         }
     }
-    fn __mod__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
-        PyTree::modulo(&self, &other)
+    fn __mod__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        PyTree::modulo(self, other)
     }
-    fn __rmod__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn __rmod__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         if other.is_instance_of::<PyTree>() {
             let other = PyTree::extract_bound(other)?;
             Ok(PyTree {
@@ -496,7 +496,7 @@ impl PyTree {
     ) -> PyResult<Self> {
         match modval {
             Some(_) => Err(PyRuntimeError::new_err("mod option not available for Tree")),
-            None => Ok(PyTree::pow(&self, &other)?),
+            None => Ok(PyTree::pow(self, other)?),
         }
     }
 }
