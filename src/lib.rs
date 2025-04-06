@@ -96,23 +96,38 @@ impl PyTree {
             _val: ctx.export(root)?,
         })
     }
-    fn to_vm(&self) -> Result<String, PyFidgetError> {
+    fn to_vm(&self) -> PyResult<String> {
         let mut ctx = Context::new();
         let root = ctx.import(&self._val);
-        let (ssatape, _) = SsaTape::new(&ctx, &[root])?;
+        let (ssatape, varmap) = match SsaTape::new(&ctx, &[root]) {
+            Ok(x) => x,
+            Err(_) => return Err(PyRuntimeError::new_err("Error while building SSA tape")),
+        };
         let mut result = String::new();
         let mut addr: u32 = 0;
         let mut regmap = HashMap::<u32, u32>::new();
         let mut constmap = HashMap::<[u8; 4], u32>::new();
+        let mut axismap = HashMap::new();
+        if let Some(x) = varmap.get(&fidget::var::Var::X) {
+            axismap.insert(x, "var-x");
+        }
+        if let Some(y) = varmap.get(&fidget::var::Var::Y) {
+            axismap.insert(y, "var-y");
+        }
+        if let Some(z) = varmap.get(&fidget::var::Var::Z) {
+            axismap.insert(z, "var-z");
+        }
         for &op in ssatape.tape.iter().rev() {
             match op {
                 SsaOp::Output(..) => {}
                 SsaOp::Input(out, i) => {
-                    let varname = match i {
-                        0 => "var-x",
-                        1 => "var-y",
-                        2 => "var-z",
-                        _ => unreachable!(),
+                    let varname = if !axismap.contains_key(&(i as usize)) {
+                        return Err(PyRuntimeError::new_err(format!("Error while building SSA tape {i}")));
+                    } else {
+                        match axismap.get(&(i as usize)) {
+                            Some(x) => x,
+                            None => unreachable!()
+                        }
                     };
                     result.push_str(&format!("${addr} {varname}\n"));
                     regmap.insert(out, addr);
@@ -669,10 +684,10 @@ impl PyTree {
         PyTree::neg(self)
     }
     fn __or__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        PyTree::or(self, other)
+        PyTree::min(self, other)
     }
     fn __and__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        PyTree::and(self, other)
+        PyTree::max(self, other)
     }
     fn __abs__(&self) -> Self {
         PyTree::abs(self)
