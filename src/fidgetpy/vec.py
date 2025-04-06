@@ -83,11 +83,11 @@ class Vector:
         return self / self.length()
 
     @staticmethod
-    def _broadcast_bop(fn, a, b) -> Self:
-        if isinstance(a, Vector):
-            return Vector(*itertools.starmap(fn, zip(a, itertools.repeat(b, len(a)))))
+    def _broadcast_bop(fn, a, b, swap=False) -> Self:
+        if swap:
+            return Vector(*itertools.starmap(fn, zip(itertools.repeat(b, len(a)), a)))
         else:
-            return Vector(*itertools.starmap(fn, zip(b, itertools.repeat(a, len(b)))))
+            return Vector(*itertools.starmap(fn, zip(a, itertools.repeat(b, len(a)))))
 
     @staticmethod
     def _elementwise_bop(fn, a, b) -> Self:
@@ -107,7 +107,7 @@ class Vector:
                     return self._elementwise_bop(fn, self._items, other._items)
             else:  # broadcast operation
                 if swap:
-                    return self._broadcast_bop(fn, other, self)
+                    return self._broadcast_bop(fn, self, other, True)
                 else:
                     return self._broadcast_bop(fn, self, other)
 
@@ -129,7 +129,8 @@ class Vector:
     # __floordiv__ = __rfloordiv__ = _binary_op(operator.floordiv)
     __mod__ = _binary_op(operator.mod)
     __rmod__ = _binary_op(operator.mod, True)
-    __pow__ = __rpow__ = _binary_op(operator.pow)
+    __pow__ = _binary_op(operator.pow)
+    __rpow__ = _binary_op(operator.pow, True)
     __neg__ = _unary_op(operator.neg)
     __abs__ = _unary_op(abs)
     __round__ = _unary_op(round)

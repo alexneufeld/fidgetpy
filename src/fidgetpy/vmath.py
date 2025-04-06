@@ -95,3 +95,6 @@ def smoothstep(edge0, edge1, x):
 
 def mix(x, y, a):
     return x * (1.0 - a) + y * a
+
+def dot(a, b):
+    return a.dot(b)

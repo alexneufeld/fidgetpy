@@ -3,8 +3,8 @@ use fidget::{
     context::{Context, Tree},
     mesh::{Mesh, Settings},
 };
-use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
+use pyo3::{exceptions::PyRuntimeError, IntoPyObjectExt};
 use std::{cmp::Ordering, collections::HashMap};
 
 struct PyFidgetError(fidget::Error);
@@ -122,11 +122,13 @@ impl PyTree {
                 SsaOp::Output(..) => {}
                 SsaOp::Input(out, i) => {
                     let varname = if !axismap.contains_key(&(i as usize)) {
-                        return Err(PyRuntimeError::new_err(format!("Error while building SSA tape {i}")));
+                        return Err(PyRuntimeError::new_err(format!(
+                            "Error while building SSA tape {i}"
+                        )));
                     } else {
                         match axismap.get(&(i as usize)) {
                             Some(x) => x,
-                            None => unreachable!()
+                            None => unreachable!(),
                         }
                     };
                     result.push_str(&format!("${addr} {varname}\n"));
@@ -493,9 +495,12 @@ impl PyTree {
         }
     }
     // binary operations
-    fn pow(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn pow(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         // https://en.wikipedia.org/wiki/Exponentiation_by_squaring
-        let mut n: i64 = other.extract()?;
+        let mut n: i64 = match other.extract() {
+            Ok(ex) => ex,
+            Err(..) => return Ok(other.py().NotImplemented()),
+        };
         let mut res = self._val.to_owned();
         let mut y: Tree = Tree::constant(1.0);
         let mut first_y_mul = false;
@@ -505,9 +510,10 @@ impl PyTree {
                 res = Tree::constant(1.0) / res;
             }
             Ordering::Equal => {
-                return Ok(PyTree {
+                return PyTree {
                     _val: Tree::constant(1.0),
-                });
+                }
+                .into_py_any(other.py());
             }
             Ordering::Greater => {}
         }
@@ -525,152 +531,196 @@ impl PyTree {
             n /= 2;
         }
         if first_y_mul {
-            Ok(PyTree { _val: res * y })
+            PyTree { _val: res * y }.into_py_any(other.py())
         } else {
-            Ok(PyTree { _val: res })
+            PyTree { _val: res }.into_py_any(other.py())
         }
     }
-    fn add(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn add(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned() + other._val.to_owned(),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned() + ex._val.to_owned(),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned() + Tree::constant(value),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned() + Tree::constant(ex),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn sub(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn sub(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned() - other._val.to_owned(),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned() - ex._val.to_owned(),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned() - Tree::constant(value),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned() - Tree::constant(ex),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn mul(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn mul(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned() * other._val.to_owned(),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned() * ex._val.to_owned(),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned() * Tree::constant(value),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned() * Tree::constant(ex),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn div(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn div(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned() / other._val.to_owned(),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned() / ex._val.to_owned(),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned() / Tree::constant(value),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned() / Tree::constant(ex),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn max(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn max(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned().max(other._val.to_owned()),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned().max(ex._val.to_owned()),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned().max(Tree::constant(value)),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned().max(Tree::constant(ex)),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn min(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn min(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned().min(other._val.to_owned()),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned().min(ex._val.to_owned()),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned().min(Tree::constant(value)),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned().min(Tree::constant(ex)),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn compare(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn compare(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned().compare(other._val.to_owned()),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned().compare(ex._val.to_owned()),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned().compare(Tree::constant(value)),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned().compare(Tree::constant(ex)),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn modulo(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn modulo(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned().modulo(other._val.to_owned()),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned().modulo(ex._val.to_owned()),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned().modulo(Tree::constant(value)),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned().modulo(Tree::constant(ex)),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn and(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn and(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned().and(other._val.to_owned()),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned().and(ex._val.to_owned()),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned().and(Tree::constant(value)),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned().and(Tree::constant(ex)),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn or(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn or(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned().or(other._val.to_owned()),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned().or(ex._val.to_owned()),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned().or(Tree::constant(value)),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned().or(Tree::constant(ex)),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn atan2(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn atan2(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: self._val.to_owned().atan2(other._val.to_owned()),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: self._val.to_owned().atan2(ex._val.to_owned()),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: self._val.to_owned().atan2(Tree::constant(value)),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: self._val.to_owned().atan2(Tree::constant(ex)),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
     // dunder method aliases
@@ -683,83 +733,97 @@ impl PyTree {
     fn __invert__(&self) -> Self {
         PyTree::neg(self)
     }
-    fn __or__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __or__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         PyTree::min(self, other)
     }
-    fn __and__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __and__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         PyTree::max(self, other)
     }
     fn __abs__(&self) -> Self {
         PyTree::abs(self)
     }
-    fn __add__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __add__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         PyTree::add(self, other)
     }
-    fn __radd__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __radd__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         PyTree::add(self, other)
     }
-    fn __sub__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __sub__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         PyTree::sub(self, other)
     }
-    fn __rsub__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __rsub__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: other._val.to_owned() - self._val.to_owned(),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: ex._val.to_owned() - self._val.to_owned(),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: Tree::constant(value) - self._val.to_owned(),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: Tree::constant(ex) - self._val.to_owned(),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn __mul__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __mul__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         PyTree::mul(self, other)
     }
-    fn __rmul__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __rmul__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         PyTree::mul(self, other)
     }
-    fn __truediv__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __truediv__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         PyTree::div(self, other)
     }
-    fn __rtruediv__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __rtruediv__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: other._val.to_owned() / self._val.to_owned(),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: ex._val.to_owned() / self._val.to_owned(),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: Tree::constant(value) / self._val.to_owned(),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: Tree::constant(ex) / self._val.to_owned(),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn __mod__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __mod__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         PyTree::modulo(self, other)
     }
-    fn __rmod__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn __rmod__(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
-            let other = PyTree::extract_bound(other)?;
-            Ok(PyTree {
-                _val: other._val.to_owned().modulo(self._val.to_owned()),
-            })
+            let ex = PyTree::extract_bound(&other)?;
+            PyTree {
+                _val: ex._val.to_owned().modulo(self._val.to_owned()),
+            }
+            .into_py_any(other.py())
         } else {
-            let value: f64 = other.extract()?;
-            Ok(PyTree {
-                _val: Tree::constant(value).modulo(self._val.to_owned()),
-            })
+            match other.extract() {
+                Ok(ex) => PyTree {
+                    _val: Tree::constant(ex).modulo(self._val.to_owned()),
+                }
+                .into_py_any(other.py()),
+                Err(..) => Ok(other.py().NotImplemented()),
+            }
         }
     }
-    fn __pow__<'py>(
+    fn __pow__(
         &self,
-        other: &Bound<'py, PyAny>,
-        modval: Option<&Bound<'py, PyAny>>,
-    ) -> PyResult<Self> {
+        other: Bound<PyAny>,
+        modval: Option<Bound<PyAny>>,
+    ) -> Result<Py<PyAny>, PyErr> {
         match modval {
-            Some(_) => Err(PyRuntimeError::new_err("mod option not available for Tree")),
-            None => Ok(PyTree::pow(self, other)?),
+            Some(_) => Err(PyRuntimeError::new_err(
+                "mod option not available for ** (pow) for Tree",
+            )),
+            None => PyTree::pow(self, other),
         }
     }
 }
