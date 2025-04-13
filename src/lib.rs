@@ -484,7 +484,8 @@ impl PyTree {
             _val: Tree::ln(&self._val),
         }
     }
-    fn not(&self) -> Self {
+    fn not_(&self) -> Self {
+        // methods named exactly 'not', 'and', or 'or' will cause syntax errors in python code
         PyTree {
             _val: Tree::not(&self._val),
         }
@@ -672,7 +673,7 @@ impl PyTree {
             }
         }
     }
-    fn and(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
+    fn and_(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
             let ex = PyTree::extract_bound(&other)?;
             PyTree {
@@ -689,7 +690,7 @@ impl PyTree {
             }
         }
     }
-    fn or(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
+    fn or_(&self, other: Bound<PyAny>) -> Result<Py<PyAny>, PyErr> {
         if other.is_instance_of::<PyTree>() {
             let ex = PyTree::extract_bound(&other)?;
             PyTree {
