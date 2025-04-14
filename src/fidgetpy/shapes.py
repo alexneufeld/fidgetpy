@@ -2,6 +2,7 @@ from numbers import Real
 from fidgetpy._core import Tree
 from .vec import Vec3, axis
 
+
 class BoundBox:
     def __init__(self, *args) -> None:
         if len(args) == 6:  # 6 floats
@@ -25,18 +26,23 @@ class BoundBox:
     @property
     def xmin(self) -> Real:
         return self._min.x
+
     @property
     def xmax(self) -> Real:
         return self._max.x
+
     @property
     def ymin(self) -> Real:
         return self._min.y
+
     @property
     def ymax(self) -> Real:
         return self._max.y
+
     @property
     def zmin(self) -> Real:
         return self._min.z
+
     @property
     def zmax(self) -> Real:
         return self._max.z
@@ -55,7 +61,7 @@ class BoundBox:
 
     @property
     def center(self) -> Vec3:
-        return (self._max + self._min)/2
+        return (self._max + self._min) / 2
 
     @property
     def diagonal_length(self) -> Real:
@@ -72,11 +78,9 @@ class Shape:
         return self._boundbox
 
 
-def sphere(r = 1.0) -> Shape:
-    return Shape(
-        axis().length - r,
-        BoundBox(-r, -r, -r, r, r, r)
-    )
+def sphere(r=1.0) -> Shape:
+    return Shape(axis().length - r, BoundBox(-r, -r, -r, r, r, r))
+
 
 def translate(shape: Shape, *args) -> Shape:
     pass
