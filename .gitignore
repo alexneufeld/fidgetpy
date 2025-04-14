@@ -99,3 +99,6 @@ ENV/
 
 # Kate swap files
 *.kate-swp
+
+# outputs of example programs
+examples/out/
