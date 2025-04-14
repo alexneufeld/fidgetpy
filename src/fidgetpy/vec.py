@@ -149,9 +149,9 @@ _y = Tree.y()
 _z = Tree.z()
 
 
-def axis() -> Vec3:
+def axes() -> Vec3:
     return Vec3(_x, _y, _z)
 
 
-def axis2d() -> Vec2:
+def axes2d() -> Vec2:
     return Vec2(_x, _y)

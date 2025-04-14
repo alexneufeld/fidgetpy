@@ -1,6 +1,6 @@
 from fidgetpy._core import Tree
 from fidgetpy._core import Mesh
-from .vec import Vec2, Vec3, Vec4, axis, axis2d
+from .vec import Vec2, Vec3, Vec4, axes, axes2d
 from .vmath import (
     sqrt,
     sin,
@@ -28,6 +28,7 @@ from .vmath import (
     mix,
 )
 from .bop import union, fuse, intersection, common, difference, cut, xor
+from .uop import extrude_z, revolve_z
 
 __all__ = [
     "Tree",
@@ -35,8 +36,8 @@ __all__ = [
     "Vec3",
     "Vec4",
     "Vec2",
-    "axis",
-    "axis2d",
+    "axes",
+    "axes2d",
     "sqrt",
     "sin",
     "cos",
@@ -70,4 +71,6 @@ __all__ = [
     "difference",
     "cut",
     "xor",
+    "extrude_z",
+    "revolve_z",
 ]
