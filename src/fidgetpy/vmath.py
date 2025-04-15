@@ -99,3 +99,7 @@ def mix(x, y, a):
 
 def dot(a, b):
     return a.dot(b)
+
+
+def cross(a, b):
+    return a.cross(b)

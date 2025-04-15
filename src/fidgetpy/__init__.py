@@ -1,6 +1,17 @@
 from fidgetpy._core import Tree
 from fidgetpy._core import Mesh
-from .vec import Vec2, Vec3, Vec4, axes, axes2d
+from .vec import (
+    Vec2,
+    Vec3,
+    Vec4,
+    axes,
+    axes2d,
+    VectorError,
+    UnaryVectorCreationError,
+    CrossProductError,
+    VectorLengthMismatchError,
+    SwizzleError,
+)
 from .vmath import (
     sqrt,
     sin,
@@ -29,6 +40,7 @@ from .vmath import (
 )
 from .bop import union, fuse, intersection, common, difference, cut, xor
 from .uop import extrude_z, revolve_z
+from . import shapes
 
 __all__ = [
     "Tree",
@@ -73,4 +85,9 @@ __all__ = [
     "xor",
     "extrude_z",
     "revolve_z",
+    "shapes",
+    "VectorError",
+    "UnaryVectorCreationError",
+    "CrossProductError," "VectorLengthMismatchError",
+    "SwizzleError",
 ]

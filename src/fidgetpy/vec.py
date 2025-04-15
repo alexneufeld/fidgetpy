@@ -5,6 +5,7 @@ from numbers import Real
 from functools import reduce
 from math import sqrt
 from typing import Callable, Self
+from dataclasses import dataclass
 
 
 class VectorError(Exception):
@@ -27,17 +28,21 @@ class SwizzleError(VectorError):
     """Usually caused by invalid indexes in swizzle operations"""
 
 
+@dataclass(init=False, frozen=True)
 class Vector:
     """cursed glsl-like vector class"""
+
+    _items: list[Real | Tree]
 
     def __init__(self, *args):
         if len(args) < 2:
             raise UnaryVectorCreationError("Don't create vectors of length one")
         if not all(isinstance(x, (Real, Tree)) for x in args):
             raise ValueError("Can only create Vectors of Trees or real numbers")
-        self._items = args
+        # self._items = args
+        object.__setattr__(self, "_items", args)
 
-    def __getattr__(self, val):
+    def __getattr__(self, val: str) -> Self | Real | Tree:
         if not set(val) <= set("xyzw"):
             raise AttributeError(f"'Vec{len(self)}' object has no attribute '{val}'")
         if not set(val) <= set("xyzw"[: len(self)]):
@@ -55,7 +60,7 @@ class Vector:
     def __iter__(self):
         return (x for x in self._items)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._items)
 
     def dot(self, other) -> Real | Tree:
@@ -126,7 +131,6 @@ class Vector:
     __mul__ = __rmul__ = _binary_op(operator.mul)
     __truediv__ = _binary_op(operator.truediv)
     __rtruediv__ = _binary_op(operator.truediv, True)
-    # __floordiv__ = __rfloordiv__ = _binary_op(operator.floordiv)
     __mod__ = _binary_op(operator.mod)
     __rmod__ = _binary_op(operator.mod, True)
     __pow__ = _binary_op(operator.pow)
@@ -134,13 +138,22 @@ class Vector:
     __neg__ = _unary_op(operator.neg)
     __abs__ = _unary_op(abs)
     __round__ = _unary_op(round)
-    __eq__ = _binary_op(operator.eq)
 
     def __repr__(self) -> str:
         return f"Vec{len(self._items)}{self._items}"
 
 
-Vec2 = Vec3 = Vec4 = Vector
+def Vec2(x, y):
+    return Vector(x, y)
+
+
+def Vec3(x, y, z):
+    return Vector(x, y, z)
+
+
+def Vec4(x, y, z, w):
+    return Vector(x, y, z, w)
+
 
 # keep a single copy of each axis word
 # probably reduces memory usage

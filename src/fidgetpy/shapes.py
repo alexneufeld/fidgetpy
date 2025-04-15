@@ -1,8 +1,10 @@
 from numbers import Real
 from fidgetpy._core import Tree
-from .vec import Vec3, axis
+from .vec import Vec3, axes
+from dataclasses import dataclass
 
 
+@dataclass(init=False, frozen=True)
 class BoundBox:
     def __init__(self, *args) -> None:
         if len(args) == 6:  # 6 floats
@@ -12,16 +14,18 @@ class BoundBox:
             xmax, ymax, zmax = args[1]
         elif len(args) == 1:  # another boundbox
             pass
-        self._min = Vec3(
+        _min = Vec3(
             min(xmin, xmax),
             min(ymin, ymax),
             min(zmin, zmax),
         )
-        self._max = Vec3(
+        _max = Vec3(
             max(xmin, xmax),
             max(ymin, ymax),
             max(zmin, zmax),
         )
+        object.__setattr__(self, "_min", _min)
+        object.__setattr__(self, "_max", _max)
 
     @property
     def xmin(self) -> Real:
@@ -68,19 +72,31 @@ class BoundBox:
         return (self._max - self._min).length()
 
 
+@dataclass(frozen=True)
 class Shape:
-    def __init__(self, tree: Tree, boundbox: BoundBox) -> None:
-        self._tree = tree
-        self._boundbox = boundbox
+    tree: Tree
+    boundbox: BoundBox
 
-    @property
-    def boundbox(self):
-        return self._boundbox
+    def mesh(self, depth):
+        return self.tree.mesh(depth)
+
+    def eval(self, x, y, z):
+        return self.tree.eval(x, y, z)
 
 
 def sphere(r=1.0) -> Shape:
-    return Shape(axis().length - r, BoundBox(-r, -r, -r, r, r, r))
+    """
+    A sphere with radius r, centerered at the origin
+    """
+    return Shape(axes().length() - r, BoundBox(-r, -r, -r, r, r, r))
 
 
-def translate(shape: Shape, *args) -> Shape:
-    pass
+def box(xlen, ylen, zlen):
+    return None
+
+
+def translate(shp: Shape, mov: Vec3) -> Shape:
+    return Shape(
+        shp.tree.remap_xyz(*(axes - mov)),
+        BoundBox(shp.boundbox._min + mov, shp.boundbox._max + mov),
+    )
