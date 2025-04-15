@@ -158,6 +158,6 @@ if __name__ == "__main__":
     shp = fp.extrude_z(HersheyGothEnglish.render_string("Hello!", 0.7, 0.01), 0.1)
     shp = shp.remap_xyz(p.x + 1.0, p.y + 0.2, p.z)
     outfile = os.path.join(os.path.dirname(__file__), "out/svg_font_test.stl")
-    os.makedirs(os.path.dirname(outfile),exist_ok=True)
+    os.makedirs(os.path.dirname(outfile), exist_ok=True)
     with open(outfile, "wb") as f:
         f.write(shp.mesh(8).to_stl())
