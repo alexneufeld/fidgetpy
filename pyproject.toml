@@ -16,6 +16,7 @@ fidgetpy = "fidgetpy:main"
 module-name = "fidgetpy._core"
 python-packages = ["fidgetpy"]
 python-source = "src"
+strip = true
 
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
