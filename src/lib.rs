@@ -89,6 +89,13 @@ impl PyTree {
         ctx.import(&self._val);
         ctx.dot()
     }
+    fn eval(&self, x: f64, y: f64, z: f64) -> Result<f64, PyFidgetError> {
+        // slow point-wise evaluation
+        // useful for debugging and testing
+        let mut ctx = Context::new();
+        let root = ctx.import(&self._val);
+        Ok(ctx.eval_xyz(root, x, y, z)?)
+    }
     #[staticmethod]
     fn from_vm(src: &str) -> Result<Self, PyFidgetError> {
         let (ctx, root) = Context::from_text(src.as_bytes())?;
