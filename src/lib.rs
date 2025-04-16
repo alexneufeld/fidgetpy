@@ -1,12 +1,13 @@
 use fidget::{
     compiler::{SsaOp, SsaTape},
-    context::{Context, Tree},
+    context::{Context, Tree, TreeOp},
     mesh::{Mesh, Settings},
     render::View3,
 };
 use nalgebra::base::Vector3;
 use pyo3::prelude::*;
 use pyo3::{exceptions::PyRuntimeError, IntoPyObjectExt};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::{cmp::Ordering, collections::HashMap};
 
 struct PyFidgetError(fidget::Error);
@@ -32,6 +33,48 @@ struct PyTree {
 #[pyclass(name = "Mesh")]
 struct PyMesh {
     _val: Mesh,
+}
+
+#[derive(Clone)]
+#[pyclass(name = "Opcode")]
+enum PyOpcode {
+    #[pyo3(name = "UPPERCASE")]
+    Neg(),
+    Abs(),
+    Recip(),
+    Sqrt(),
+    Square(),
+    Floor(),
+    Ceil(),
+    Round(),
+    Sin(),
+    Cos(),
+    Tan(),
+    Asin(),
+    Acos(),
+    Atan(),
+    Exp(),
+    Ln(),
+    Not(),
+    // binary
+    Add(),
+    Sub(),
+    Mul(),
+    Div(),
+    Atan2(),
+    Min(),
+    Max(),
+    Compare(),
+    Mod(),
+    And(),
+    Or(),
+    // other
+    Var_X(),
+    Var_Y(),
+    Var_Z(),
+    Var(u64),
+    Const(f64),
+    RemapAxes(),
 }
 
 #[pymethods]
@@ -97,6 +140,63 @@ impl PyTree {
         let mut ctx = Context::new();
         let root = ctx.import(&self._val);
         Ok(ctx.eval_xyz(root, x, y, z)?)
+    }
+    #[getter]
+    unsafe fn opcode(&self) -> Result<PyOpcode, PyErr> {
+        match self._val.as_ptr().as_ref() {
+            None => Err(PyRuntimeError::new_err("nope!")),
+            Some(x) => Ok(match x {
+                TreeOp::Input(op) => match op {
+                    fidget::var::Var::X => PyOpcode::Var_X(),
+                    fidget::var::Var::Y => PyOpcode::Var_Y(),
+                    fidget::var::Var::Z => PyOpcode::Var_Z(),
+                    fidget::var::Var::V(_var_index) => {
+                        let mut hasher = DefaultHasher::new();
+                        _var_index.hash(&mut hasher);
+                        PyOpcode::Var(hasher.finish())
+                    }
+                },
+                TreeOp::Const(val) => PyOpcode::Const(*val),
+                TreeOp::Binary(binary_opcode, _arc, _arc1) => match binary_opcode {
+                    fidget::context::BinaryOpcode::Add => PyOpcode::Add(),
+                    fidget::context::BinaryOpcode::Sub => PyOpcode::Sub(),
+                    fidget::context::BinaryOpcode::Mul => PyOpcode::Mul(),
+                    fidget::context::BinaryOpcode::Div => PyOpcode::Div(),
+                    fidget::context::BinaryOpcode::Atan => PyOpcode::Atan2(),
+                    fidget::context::BinaryOpcode::Min => PyOpcode::Min(),
+                    fidget::context::BinaryOpcode::Max => PyOpcode::Max(),
+                    fidget::context::BinaryOpcode::Compare => PyOpcode::Compare(),
+                    fidget::context::BinaryOpcode::Mod => PyOpcode::Mod(),
+                    fidget::context::BinaryOpcode::And => PyOpcode::And(),
+                    fidget::context::BinaryOpcode::Or => PyOpcode::Or(),
+                },
+                TreeOp::Unary(unary_opcode, _arc) => match unary_opcode {
+                    fidget::context::UnaryOpcode::Neg => PyOpcode::Neg(),
+                    fidget::context::UnaryOpcode::Abs => PyOpcode::Abs(),
+                    fidget::context::UnaryOpcode::Recip => PyOpcode::Recip(),
+                    fidget::context::UnaryOpcode::Sqrt => PyOpcode::Sqrt(),
+                    fidget::context::UnaryOpcode::Square => PyOpcode::Square(),
+                    fidget::context::UnaryOpcode::Floor => PyOpcode::Floor(),
+                    fidget::context::UnaryOpcode::Ceil => PyOpcode::Ceil(),
+                    fidget::context::UnaryOpcode::Round => PyOpcode::Round(),
+                    fidget::context::UnaryOpcode::Sin => PyOpcode::Sin(),
+                    fidget::context::UnaryOpcode::Cos => PyOpcode::Cos(),
+                    fidget::context::UnaryOpcode::Tan => PyOpcode::Tan(),
+                    fidget::context::UnaryOpcode::Acos => PyOpcode::Acos(),
+                    fidget::context::UnaryOpcode::Asin => PyOpcode::Asin(),
+                    fidget::context::UnaryOpcode::Atan => PyOpcode::Atan(),
+                    fidget::context::UnaryOpcode::Exp => PyOpcode::Exp(),
+                    fidget::context::UnaryOpcode::Ln => PyOpcode::Ln(),
+                    fidget::context::UnaryOpcode::Not => PyOpcode::Not(),
+                },
+                TreeOp::RemapAxes {
+                    target: _,
+                    x: _,
+                    y: _,
+                    z: _,
+                } => PyOpcode::RemapAxes(),
+            }),
+        }
     }
     #[staticmethod]
     fn from_vm(src: &str) -> Result<Self, PyFidgetError> {
@@ -853,5 +953,9 @@ impl PyTree {
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTree>()?;
     m.add_class::<PyMesh>()?;
+    m.add_class::<PyMesh>()?;
+    // m.add_class::<PyUnaryOpcode>()?;
+    // m.add_class::<PyBinaryOpcode>()?;
+    m.add_class::<PyOpcode>()?;
     Ok(())
 }
