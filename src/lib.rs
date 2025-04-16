@@ -37,81 +37,6 @@ struct PyMesh {
     _val: Mesh,
 }
 
-#[derive(Clone)]
-#[pyclass(name = "Opcode")]
-enum PyOpcode {
-    #[pyo3(name = "NEG")]
-    Neg(),
-    #[pyo3(name = "ABS")]
-    Abs(),
-    #[pyo3(name = "RECIP")]
-    Recip(),
-    #[pyo3(name = "SQRT")]
-    Sqrt(),
-    #[pyo3(name = "SQUARE")]
-    Square(),
-    #[pyo3(name = "FLOOR")]
-    Floor(),
-    #[pyo3(name = "CEIL")]
-    Ceil(),
-    #[pyo3(name = "ROUND")]
-    Round(),
-    #[pyo3(name = "SIN")]
-    Sin(),
-    #[pyo3(name = "COS")]
-    Cos(),
-    #[pyo3(name = "TAN")]
-    Tan(),
-    #[pyo3(name = "ASIN")]
-    Asin(),
-    #[pyo3(name = "ACOS")]
-    Acos(),
-    #[pyo3(name = "ATAN")]
-    Atan(),
-    #[pyo3(name = "EXP")]
-    Exp(),
-    #[pyo3(name = "LN")]
-    Ln(),
-    #[pyo3(name = "NOT")]
-    Not(),
-    // binary
-    #[pyo3(name = "ADD")]
-    Add(),
-    #[pyo3(name = "SUB")]
-    Sub(),
-    #[pyo3(name = "MUL")]
-    Mul(),
-    #[pyo3(name = "DIV")]
-    Div(),
-    #[pyo3(name = "ATAN2")]
-    Atan2(),
-    #[pyo3(name = "MIN")]
-    Min(),
-    #[pyo3(name = "MAX")]
-    Max(),
-    #[pyo3(name = "COMPARE")]
-    Compare(),
-    #[pyo3(name = "MOD")]
-    Mod(),
-    #[pyo3(name = "AND")]
-    And(),
-    #[pyo3(name = "OR")]
-    Or(),
-    // other
-    #[pyo3(name = "VAR_X")]
-    VarX(),
-    #[pyo3(name = "VAR_Y")]
-    VarY(),
-    #[pyo3(name = "VAR_Z")]
-    VarZ(),
-    #[pyo3(name = "VAR")]
-    Var { value: u64 },
-    #[pyo3(name = "CONST")]
-    Const { value: f64 },
-    #[pyo3(name = "REMAP_AXES")]
-    RemapAxes(),
-}
-
 #[pymethods]
 impl PyMesh {
     #[getter]
@@ -136,7 +61,6 @@ impl PyMesh {
         let mut out = std::vec::Vec::new();
         const HEADER: &[u8] = b"This is a binary STL file exported by Fidget";
         out.extend(HEADER);
-        // static_assertions::const_assert!(HEADER.len() <= 80);
         out.extend([0u8; 80 - HEADER.len()]);
         out.extend((self._val.triangles.len() as u32).to_le_bytes());
         for t in &self._val.triangles {
@@ -183,151 +107,37 @@ impl PyTree {
         for (key, value) in vars.into_iter() {
             let key_tree: PyTree = match key.extract() {
                 Ok(k) => k,
-                Err(..) => return Err(PyRuntimeError::new_err("aaaaa")),
+                Err(..) => {
+                    return Err(PyRuntimeError::new_err(
+                        "Could not recover useable Tree Operation from value map",
+                    ))
+                }
             };
 
             let val_float: f64 = match value.extract() {
                 Ok(v) => v,
-                Err(..) => return Err(PyRuntimeError::new_err("bbbbb")),
+                Err(..) => {
+                    return Err(PyRuntimeError::new_err(
+                        "Could not recover useable Tree Operation from value map",
+                    ))
+                }
             };
 
             let this_var = match key_tree._val.to_owned().var() {
                 Some(v) => v,
-                None => return Err(PyRuntimeError::new_err("ccccc")),
+                None => {
+                    return Err(PyRuntimeError::new_err(
+                        "Could not recover useable Tree Operation from value map",
+                    ))
+                }
             };
             varmap.insert(this_var, val_float);
         }
         match ctx.eval(root, &varmap) {
             Ok(v) => Ok(v),
-            Err(..) => Err(PyRuntimeError::new_err("ddddd")),
-        }
-    }
-    #[getter]
-    unsafe fn opcode(&self) -> Result<PyOpcode, PyErr> {
-        match self._val.as_ptr().as_ref() {
-            None => Err(PyRuntimeError::new_err("nope!")),
-            Some(x) => Ok(match x {
-                TreeOp::Input(op) => match op {
-                    fidget::var::Var::X => PyOpcode::VarX(),
-                    fidget::var::Var::Y => PyOpcode::VarY(),
-                    fidget::var::Var::Z => PyOpcode::VarZ(),
-                    fidget::var::Var::V(_var_index) => {
-                        let mut hasher = DefaultHasher::new();
-                        _var_index.hash(&mut hasher);
-                        PyOpcode::Var {
-                            value: hasher.finish(),
-                        }
-                    }
-                },
-                TreeOp::Const(val) => PyOpcode::Const { value: *val },
-                TreeOp::Binary(binary_opcode, _arc, _arc1) => match binary_opcode {
-                    fidget::context::BinaryOpcode::Add => PyOpcode::Add(),
-                    fidget::context::BinaryOpcode::Sub => PyOpcode::Sub(),
-                    fidget::context::BinaryOpcode::Mul => PyOpcode::Mul(),
-                    fidget::context::BinaryOpcode::Div => PyOpcode::Div(),
-                    fidget::context::BinaryOpcode::Atan => PyOpcode::Atan2(),
-                    fidget::context::BinaryOpcode::Min => PyOpcode::Min(),
-                    fidget::context::BinaryOpcode::Max => PyOpcode::Max(),
-                    fidget::context::BinaryOpcode::Compare => PyOpcode::Compare(),
-                    fidget::context::BinaryOpcode::Mod => PyOpcode::Mod(),
-                    fidget::context::BinaryOpcode::And => PyOpcode::And(),
-                    fidget::context::BinaryOpcode::Or => PyOpcode::Or(),
-                },
-                TreeOp::Unary(unary_opcode, _arc) => match unary_opcode {
-                    fidget::context::UnaryOpcode::Neg => PyOpcode::Neg(),
-                    fidget::context::UnaryOpcode::Abs => PyOpcode::Abs(),
-                    fidget::context::UnaryOpcode::Recip => PyOpcode::Recip(),
-                    fidget::context::UnaryOpcode::Sqrt => PyOpcode::Sqrt(),
-                    fidget::context::UnaryOpcode::Square => PyOpcode::Square(),
-                    fidget::context::UnaryOpcode::Floor => PyOpcode::Floor(),
-                    fidget::context::UnaryOpcode::Ceil => PyOpcode::Ceil(),
-                    fidget::context::UnaryOpcode::Round => PyOpcode::Round(),
-                    fidget::context::UnaryOpcode::Sin => PyOpcode::Sin(),
-                    fidget::context::UnaryOpcode::Cos => PyOpcode::Cos(),
-                    fidget::context::UnaryOpcode::Tan => PyOpcode::Tan(),
-                    fidget::context::UnaryOpcode::Acos => PyOpcode::Acos(),
-                    fidget::context::UnaryOpcode::Asin => PyOpcode::Asin(),
-                    fidget::context::UnaryOpcode::Atan => PyOpcode::Atan(),
-                    fidget::context::UnaryOpcode::Exp => PyOpcode::Exp(),
-                    fidget::context::UnaryOpcode::Ln => PyOpcode::Ln(),
-                    fidget::context::UnaryOpcode::Not => PyOpcode::Not(),
-                },
-                TreeOp::RemapAxes {
-                    target: _,
-                    x: _,
-                    y: _,
-                    z: _,
-                } => PyOpcode::RemapAxes(),
-            }),
-        }
-    }
-    #[getter]
-    unsafe fn operands(&self) -> PyResult<Vec<PyTree>> {
-        match self._val.as_ptr().as_ref() {
-            None => panic!(),
-            Some(x) => match x {
-                TreeOp::Input(..) => Ok(vec![]),
-                TreeOp::Const(..) => Ok(vec![]),
-                TreeOp::Binary(_, op1, op2) => {
-                    let to1 = match Arc::into_inner(op1.clone()) {
-                        Some(x) => x,
-                        None => return Err(PyRuntimeError::new_err("ddddd")),
-                    };
-                    let to2 = match Arc::into_inner(op2.clone()) {
-                        Some(x) => x,
-                        None => return Err(PyRuntimeError::new_err("ddddd")),
-                    };
-                    Ok(vec![
-                        PyTree {
-                            _val: Tree::from(to1),
-                        },
-                        PyTree {
-                            _val: Tree::from(to2),
-                        },
-                    ])
-                }
-                TreeOp::Unary(_, op1) => {
-                    // let to1 = match Arc::into_inner(op1.clone()) {
-                    //     Some(x) => x,
-                    //     None => return Err(PyRuntimeError::new_err("ddddd")),
-                    // };
-                    Ok(vec![PyTree {
-                        _val: Arc::<TreeOp>::into_inner(*op1)?,
-                    }])
-                }
-                TreeOp::RemapAxes { target, x, y, z } => {
-                    let totarget = match Arc::into_inner(target.clone()) {
-                        Some(v) => v,
-                        None => return Err(PyRuntimeError::new_err("ddddd")),
-                    };
-                    let tox = match Arc::into_inner(x.clone()) {
-                        Some(v) => v,
-                        None => return Err(PyRuntimeError::new_err("ddddd")),
-                    };
-                    let toy = match Arc::into_inner(y.clone()) {
-                        Some(v) => v,
-                        None => return Err(PyRuntimeError::new_err("ddddd")),
-                    };
-                    let toz = match Arc::into_inner(z.clone()) {
-                        Some(v) => v,
-                        None => return Err(PyRuntimeError::new_err("ddddd")),
-                    };
-                    Ok(vec![
-                        PyTree {
-                            _val: Tree::from(totarget),
-                        },
-                        PyTree {
-                            _val: Tree::from(tox),
-                        },
-                        PyTree {
-                            _val: Tree::from(toy),
-                        },
-                        PyTree {
-                            _val: Tree::from(toz),
-                        },
-                    ])
-                }
-            },
+            Err(..) => Err(PyRuntimeError::new_err(
+                "Could not recover useable Tree Operation from value map",
+            )),
         }
     }
     #[staticmethod]
@@ -632,8 +442,6 @@ impl PyTree {
         );
         let mut ctx = Context::new();
         let root = ctx.import(&remapped_tree);
-        // let root = ctx.import(&self._val);
-        // root.remap_xyz();
         Ok(PyTree {
             _val: ctx.export(root)?,
         })
