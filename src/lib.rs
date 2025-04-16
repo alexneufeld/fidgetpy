@@ -3,11 +3,13 @@ use fidget::{
     context::{Context, Tree, TreeOp},
     mesh::{Mesh, Settings},
     render::View3,
+    var::Var,
 };
 use nalgebra::base::Vector3;
 use pyo3::prelude::*;
-use pyo3::{exceptions::PyRuntimeError, IntoPyObjectExt};
+use pyo3::{exceptions::PyRuntimeError, types::PyDict, IntoPyObjectExt};
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::sync::Arc;
 use std::{cmp::Ordering, collections::HashMap};
 
 struct PyFidgetError(fidget::Error);
@@ -38,42 +40,75 @@ struct PyMesh {
 #[derive(Clone)]
 #[pyclass(name = "Opcode")]
 enum PyOpcode {
-    #[pyo3(name = "UPPERCASE")]
+    #[pyo3(name = "NEG")]
     Neg(),
+    #[pyo3(name = "ABS")]
     Abs(),
+    #[pyo3(name = "RECIP")]
     Recip(),
+    #[pyo3(name = "SQRT")]
     Sqrt(),
+    #[pyo3(name = "SQUARE")]
     Square(),
+    #[pyo3(name = "FLOOR")]
     Floor(),
+    #[pyo3(name = "CEIL")]
     Ceil(),
+    #[pyo3(name = "ROUND")]
     Round(),
+    #[pyo3(name = "SIN")]
     Sin(),
+    #[pyo3(name = "COS")]
     Cos(),
+    #[pyo3(name = "TAN")]
     Tan(),
+    #[pyo3(name = "ASIN")]
     Asin(),
+    #[pyo3(name = "ACOS")]
     Acos(),
+    #[pyo3(name = "ATAN")]
     Atan(),
+    #[pyo3(name = "EXP")]
     Exp(),
+    #[pyo3(name = "LN")]
     Ln(),
+    #[pyo3(name = "NOT")]
     Not(),
     // binary
+    #[pyo3(name = "ADD")]
     Add(),
+    #[pyo3(name = "SUB")]
     Sub(),
+    #[pyo3(name = "MUL")]
     Mul(),
+    #[pyo3(name = "DIV")]
     Div(),
+    #[pyo3(name = "ATAN2")]
     Atan2(),
+    #[pyo3(name = "MIN")]
     Min(),
+    #[pyo3(name = "MAX")]
     Max(),
+    #[pyo3(name = "COMPARE")]
     Compare(),
+    #[pyo3(name = "MOD")]
     Mod(),
+    #[pyo3(name = "AND")]
     And(),
+    #[pyo3(name = "OR")]
     Or(),
     // other
-    Var_X(),
-    Var_Y(),
-    Var_Z(),
-    Var(u64),
-    Const(f64),
+    #[pyo3(name = "VAR_X")]
+    VarX(),
+    #[pyo3(name = "VAR_Y")]
+    VarY(),
+    #[pyo3(name = "VAR_Z")]
+    VarZ(),
+    #[pyo3(name = "VAR")]
+    Var { value: u64 },
+    #[pyo3(name = "CONST")]
+    Const { value: f64 },
+    #[pyo3(name = "REMAP_AXES")]
     RemapAxes(),
 }
 
@@ -141,22 +176,50 @@ impl PyTree {
         let root = ctx.import(&self._val);
         Ok(ctx.eval_xyz(root, x, y, z)?)
     }
+    fn eval_map(&self, vars: Bound<PyDict>) -> Result<f64, PyErr> {
+        let mut ctx = Context::new();
+        let root = ctx.import(&self._val);
+        let mut varmap: HashMap<Var, f64> = HashMap::new();
+        for (key, value) in vars.into_iter() {
+            let key_tree: PyTree = match key.extract() {
+                Ok(k) => k,
+                Err(..) => return Err(PyRuntimeError::new_err("aaaaa")),
+            };
+
+            let val_float: f64 = match value.extract() {
+                Ok(v) => v,
+                Err(..) => return Err(PyRuntimeError::new_err("bbbbb")),
+            };
+
+            let this_var = match key_tree._val.to_owned().var() {
+                Some(v) => v,
+                None => return Err(PyRuntimeError::new_err("ccccc")),
+            };
+            varmap.insert(this_var, val_float);
+        }
+        match ctx.eval(root, &varmap) {
+            Ok(v) => Ok(v),
+            Err(..) => Err(PyRuntimeError::new_err("ddddd")),
+        }
+    }
     #[getter]
     unsafe fn opcode(&self) -> Result<PyOpcode, PyErr> {
         match self._val.as_ptr().as_ref() {
             None => Err(PyRuntimeError::new_err("nope!")),
             Some(x) => Ok(match x {
                 TreeOp::Input(op) => match op {
-                    fidget::var::Var::X => PyOpcode::Var_X(),
-                    fidget::var::Var::Y => PyOpcode::Var_Y(),
-                    fidget::var::Var::Z => PyOpcode::Var_Z(),
+                    fidget::var::Var::X => PyOpcode::VarX(),
+                    fidget::var::Var::Y => PyOpcode::VarY(),
+                    fidget::var::Var::Z => PyOpcode::VarZ(),
                     fidget::var::Var::V(_var_index) => {
                         let mut hasher = DefaultHasher::new();
                         _var_index.hash(&mut hasher);
-                        PyOpcode::Var(hasher.finish())
+                        PyOpcode::Var {
+                            value: hasher.finish(),
+                        }
                     }
                 },
-                TreeOp::Const(val) => PyOpcode::Const(*val),
+                TreeOp::Const(val) => PyOpcode::Const { value: *val },
                 TreeOp::Binary(binary_opcode, _arc, _arc1) => match binary_opcode {
                     fidget::context::BinaryOpcode::Add => PyOpcode::Add(),
                     fidget::context::BinaryOpcode::Sub => PyOpcode::Sub(),
@@ -196,6 +259,75 @@ impl PyTree {
                     z: _,
                 } => PyOpcode::RemapAxes(),
             }),
+        }
+    }
+    #[getter]
+    unsafe fn operands(&self) -> PyResult<Vec<PyTree>> {
+        match self._val.as_ptr().as_ref() {
+            None => panic!(),
+            Some(x) => match x {
+                TreeOp::Input(..) => Ok(vec![]),
+                TreeOp::Const(..) => Ok(vec![]),
+                TreeOp::Binary(_, op1, op2) => {
+                    let to1 = match Arc::into_inner(op1.clone()) {
+                        Some(x) => x,
+                        None => return Err(PyRuntimeError::new_err("ddddd")),
+                    };
+                    let to2 = match Arc::into_inner(op2.clone()) {
+                        Some(x) => x,
+                        None => return Err(PyRuntimeError::new_err("ddddd")),
+                    };
+                    Ok(vec![
+                        PyTree {
+                            _val: Tree::from(to1),
+                        },
+                        PyTree {
+                            _val: Tree::from(to2),
+                        },
+                    ])
+                }
+                TreeOp::Unary(_, op1) => {
+                    // let to1 = match Arc::into_inner(op1.clone()) {
+                    //     Some(x) => x,
+                    //     None => return Err(PyRuntimeError::new_err("ddddd")),
+                    // };
+                    Ok(vec![PyTree {
+                        _val: Arc::<TreeOp>::into_inner(*op1)?,
+                    }])
+                }
+                TreeOp::RemapAxes { target, x, y, z } => {
+                    let totarget = match Arc::into_inner(target.clone()) {
+                        Some(v) => v,
+                        None => return Err(PyRuntimeError::new_err("ddddd")),
+                    };
+                    let tox = match Arc::into_inner(x.clone()) {
+                        Some(v) => v,
+                        None => return Err(PyRuntimeError::new_err("ddddd")),
+                    };
+                    let toy = match Arc::into_inner(y.clone()) {
+                        Some(v) => v,
+                        None => return Err(PyRuntimeError::new_err("ddddd")),
+                    };
+                    let toz = match Arc::into_inner(z.clone()) {
+                        Some(v) => v,
+                        None => return Err(PyRuntimeError::new_err("ddddd")),
+                    };
+                    Ok(vec![
+                        PyTree {
+                            _val: Tree::from(totarget),
+                        },
+                        PyTree {
+                            _val: Tree::from(tox),
+                        },
+                        PyTree {
+                            _val: Tree::from(toy),
+                        },
+                        PyTree {
+                            _val: Tree::from(toz),
+                        },
+                    ])
+                }
+            },
         }
     }
     #[staticmethod]
@@ -506,6 +638,25 @@ impl PyTree {
             _val: ctx.export(root)?,
         })
     }
+    fn deriv(&self, v: Self, n: i32) -> Result<PyTree, PyErr> {
+        if n < 1 {
+            return Err(PyRuntimeError::new_err(
+                "cannot take derivatives of negative order",
+            ));
+        }
+        match v._val.var() {
+            Some(val) => {
+                let mut derivative = self._val.to_owned();
+                for _ in 0..n {
+                    derivative = derivative.deriv(val);
+                }
+                Ok(PyTree { _val: derivative })
+            }
+            None => Err(PyRuntimeError::new_err(
+                "Can only differentiate with respect to a var",
+            )),
+        }
+    }
     // axis words and constants
     #[staticmethod]
     fn x() -> Self {
@@ -518,6 +669,12 @@ impl PyTree {
     #[staticmethod]
     fn z() -> Self {
         PyTree { _val: Tree::z() }
+    }
+    #[staticmethod]
+    fn var() -> Self {
+        PyTree {
+            _val: Tree::from(TreeOp::Input(Var::new())),
+        }
     }
     #[staticmethod]
     fn constant(f: f64) -> Self {

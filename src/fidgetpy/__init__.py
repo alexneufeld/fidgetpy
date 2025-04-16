@@ -1,6 +1,6 @@
 from fidgetpy._core import Tree
 from fidgetpy._core import Mesh
-from fidgetpy._core import UnaryOpcode, BinaryOpcode, Opcode
+from fidgetpy._core import Opcode
 from .vec import (
     Vec2,
     Vec3,
@@ -46,8 +46,6 @@ from . import shapes
 __all__ = [
     "Tree",
     "Mesh",
-    "UnaryOpcode",
-    "BinaryOpcode",
     "Opcode",
     "Vec3",
     "Vec4",
