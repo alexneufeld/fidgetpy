@@ -15,6 +15,11 @@ class ShapeBoundsWarning(RuntimeWarning):
 
 @dataclass(frozen=True)
 class BoundBox:
+    """
+    A rectangualr volume in 3D space, represented by the x,y,z
+    coordinates of its opposite corners.
+    """
+
     xmin: Real
     xmax: Real
     ymin: Real
@@ -51,6 +56,13 @@ class BoundBox:
 
 @dataclass(frozen=True)
 class Shape:
+    """
+    A 2D or 3D solid shape, represented by an implicit mathematical
+    expression (implicit distance field). This class implements
+    semi-automatic tracking of its bounding box, enabling optimal
+    evaluation and meshing in most cases.
+    """
+
     tree: Tree
     bounds: BoundBox
 
@@ -58,7 +70,6 @@ class Shape:
         return self.tree.eval(x, y, z)
 
     def mesh(self, depth):
-        # return self.tree.mesh(depth)
         # create an adjusted bounding box to compensate for infinite shapes
         bb = BoundBox(
             self.bounds.xmin if math.isfinite(self.bounds.xmin) else -1.0,
@@ -74,7 +85,8 @@ class Shape:
                 "mesh output may be truncated."
                 f" Original bounding box: {self.bounds}"
             )
-        # rescale the shape so that it fits inside a bounding box of [-1, 1] on all axis
+        # rescale the shape so that it fits inside a bounding box of [-1, 1]
+        # on all axis
         sf = 1.01 * max(bb.xlength, bb.ylength, bb.zlength)
         mesh = self.tree.mesh(depth, *bb.center, sf)
         return mesh
@@ -90,6 +102,11 @@ def sphere(r) -> Shape:
 
 
 def circle(r) -> Shape:
+    """
+    A 2D circle with radius r, centerered at the origin.
+
+    Exact distance field.
+    """
     return Shape(axes2d().length() - r, BoundBox(-r, r, -r, r, -inf, inf))
 
 
@@ -108,6 +125,11 @@ def box(lx, ly, lz) -> Shape:
 
 
 def rectangle(lx, ly) -> Shape:
+    """
+    A 2D rectangle, centered at the origin.
+
+    Exact distance field.
+    """
     eps = min(lx, ly) * 1e-6
     p = axes()
     q = abs(p) - Vec2(lx, ly) / 2
@@ -145,6 +167,11 @@ def cylinder(radius, height) -> Shape:
 
 
 def union(a: Shape, b: Shape) -> Shape:
+    """
+    Returns a shape that is the boolean union of the input shapes.
+
+    This operation produces an inexact (bound) distance field.
+    """
     df = min_(a.tree, b.tree)
     bb = BoundBox(
         min(a.bounds.xmin, b.bounds.xmin),
@@ -158,6 +185,11 @@ def union(a: Shape, b: Shape) -> Shape:
 
 
 def intersection(a: Shape, b: Shape) -> Shape:
+    """
+    Returns a shape containing all regions that are part of a and b.
+
+    This operation produces an inexact (bound) distance field.
+    """
     df = min_(a.tree, b.tree)
     bb = BoundBox(
         max(a.bounds.xmin, b.bounds.xmin),
@@ -171,12 +203,21 @@ def intersection(a: Shape, b: Shape) -> Shape:
 
 
 def difference(a: Shape, b: Shape) -> Shape:
+    """
+    Returns shape a with all regions contained in shape b removed.
+
+    This operation produces an inexact (bound) distance field.
+    """
     df = max_(a.tree, -b.tree)
     bb = a.bounds
     return Shape(df, bb)
 
 
 def xor(a: Shape, b: Shape) -> Shape:
+    """
+    Returns the 'exclusive or' of the input shapes.
+    This operation preserves exactness of distance fields.
+    """
     df = max_(min_(a.rtee, b.tree), -max_(a.tree, b.tree))
     bb = BoundBox(
         min(a.bounds.xmin, b.bounds.xmin),
@@ -191,7 +232,7 @@ def xor(a: Shape, b: Shape) -> Shape:
 
 def move(shp: Shape, mx, my, mz) -> Shape:
     """
-    Translate a shape by the given vector
+    Translate a shape by the given values
     """
     mov = Vec3(mx, my, mz)
     return Shape(
@@ -228,6 +269,10 @@ def expand(shp: Shape, amount: Real) -> Shape:
 
 
 def extrude_z(shp: Shape, height: Real) -> Shape:
+    """
+    Extrude a 2D shape along the z axis,
+    creating an exact distance field.
+    """
     eps = 1e-6 * height
     t = shp.tree
     x, y, z = axes()
@@ -245,6 +290,12 @@ def extrude_z(shp: Shape, height: Real) -> Shape:
 
 
 def revolve_z(shp: Shape) -> Tree:
+    """
+    Revolve a 2D shape around the z axis.
+
+    Using a convention borrowed from OpenSCAD, the shape is first rotated
+    +90 degrees about the x axis, the revolved around the z axis.
+    """
     t = shp.tree
     p = axes()
     rotated_up = t.remap_xyz(p.x, p.z, p.y)
