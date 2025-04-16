@@ -1,102 +1,214 @@
+import math
 from numbers import Real
 from fidgetpy._core import Tree
-from .vec import Vec3, axes
+from .vec import Vec2, Vec3, axes
+from .vmath import max_, min_
 from dataclasses import dataclass
 
+inf = float("inf")
 
-@dataclass(init=False, frozen=True)
+
+class ShapeBoundsWarning(RuntimeWarning):
+    """Warn the user when a shape with a non-finite
+    or otherwise messed up bounding box is rendered"""
+
+
+@dataclass(frozen=True)
 class BoundBox:
-    def __init__(self, *args) -> None:
-        if len(args) == 6:  # 6 floats
-            xmin, xmax, ymin, ymax, zmin, zmax = args
-        elif len(args) == 2:  # 2 vectors
-            xmin, ymin, zmin = args[0]
-            xmax, ymax, zmax = args[1]
-        elif len(args) == 1:  # another boundbox
-            pass
-        _min = Vec3(
-            min(xmin, xmax),
-            min(ymin, ymax),
-            min(zmin, zmax),
-        )
-        _max = Vec3(
-            max(xmin, xmax),
-            max(ymin, ymax),
-            max(zmin, zmax),
-        )
-        object.__setattr__(self, "_min", _min)
-        object.__setattr__(self, "_max", _max)
-
-    @property
-    def xmin(self) -> Real:
-        return self._min.x
-
-    @property
-    def xmax(self) -> Real:
-        return self._max.x
-
-    @property
-    def ymin(self) -> Real:
-        return self._min.y
-
-    @property
-    def ymax(self) -> Real:
-        return self._max.y
-
-    @property
-    def zmin(self) -> Real:
-        return self._min.z
-
-    @property
-    def zmax(self) -> Real:
-        return self._max.z
+    xmin: Real
+    xmax: Real
+    ymin: Real
+    ymax: Real
+    zmin: Real
+    zmax: Real
 
     @property
     def xlength(self) -> Real:
-        return self._max.x - self._min.x
+        return self.xmax - self.xmin
 
     @property
     def ylength(self) -> Real:
-        return self._max.y - self._min.y
+        return self.ymax - self.ymin
 
     @property
     def zlength(self) -> Real:
-        return self._max.z - self._min.z
+        return self.zmax - self.zmin
 
     @property
     def center(self) -> Vec3:
-        return (self._max + self._min) / 2
+        return (
+            Vec3(self.xmin, self.ymin, self.zmin)
+            + Vec3(self.xmax, self.ymax, self.zmax)
+        ) / 2
 
     @property
     def diagonal_length(self) -> Real:
-        return (self._max - self._min).length()
+        return (
+            Vec3(self.xmax, self.ymax, self.zmax)
+            - Vec3(self.xmin, self.ymin, self.zmin)
+        ).length()
 
 
 @dataclass(frozen=True)
 class Shape:
     tree: Tree
-    boundbox: BoundBox
-
-    def mesh(self, depth):
-        return self.tree.mesh(depth)
+    bounds: BoundBox
 
     def eval(self, x, y, z):
         return self.tree.eval(x, y, z)
 
+    def mesh(self, depth):
+        # return self.tree.mesh(depth)
+        # create an adjusted bounding box to compensate for infinite shapes
+        bb = BoundBox(
+            self.bounds.xmin if math.isfinite(self.bounds.xmin) else -1.0,
+            self.bounds.xmax if math.isfinite(self.bounds.xmax) else 1.0,
+            self.bounds.ymin if math.isfinite(self.bounds.ymin) else -1.0,
+            self.bounds.ymax if math.isfinite(self.bounds.ymax) else 1.0,
+            self.bounds.zmin if math.isfinite(self.bounds.zmin) else -1.0,
+            self.bounds.zmax if math.isfinite(self.bounds.zmax) else 1.0,
+        )
+        if bb != self.bounds:
+            raise ShapeBoundsWarning(
+                "Shape has at least one non-finite bounding box face, "
+                "mesh output may be truncated."
+                f" Original bounding box: {self.bounds}"
+            )
+        # rescale the shape so that it fits inside a bounding box of [-1, 1] on all axis
+        sf = 1.01 * max(bb.xlength, bb.ylength, bb.zlength)
+        mesh = self.tree.mesh(depth, *bb.center, sf)
+        return mesh
 
-def sphere(r=1.0) -> Shape:
+
+def sphere(r) -> Shape:
     """
-    A sphere with radius r, centerered at the origin
+    A sphere with radius r, centerered at the origin.
+
+    Exact distance field.
     """
-    return Shape(axes().length() - r, BoundBox(-r, -r, -r, r, r, r))
+    return Shape(axes().length() - r, BoundBox(-r, r, -r, r, -r, r))
 
 
-def box(xlen, ylen, zlen):
-    return None
+def box(lx, ly, lz) -> Shape:
+    """
+    A rectangular box, centered at the origin.
+
+    Exact distance field.
+    """
+    eps = min(lx, ly, lz) * 1e-6
+    p = axes()
+    q = abs(p) - Vec3(lx, ly, lz) / 2
+    df = (max_(q, eps)).length() + min_(max_(q.x, max_(q.y, q.z)), eps)
+    bb = BoundBox(-lx, lx, -ly, ly, -lz, lz)
+    return Shape(df, bb)
 
 
-def translate(shp: Shape, mov: Vec3) -> Shape:
+def torus(major_radius, minor_radius) -> Shape:
+    """
+    A torus, centered at the origin, aligned to the z-axis.
+
+    Exact distance field.
+    """
+    p = axes()
+    df = Vec2(p.xy.length() - major_radius, p.z).length() - minor_radius
+    halfwidth = major_radius + minor_radius
+    bb = BoundBox(
+        -halfwidth, halfwidth, -halfwidth, halfwidth, -minor_radius, minor_radius
+    )
+    return Shape(df, bb)
+
+
+def cylinder(radius, height) -> Shape:
+    """
+    A cylinder, aligned to the z-axis and centered at the origin.
+
+    Exact distance field.
+    """
+    p = axes()
+    d = abs(Vec2(p.xy.length(), p.z)) - Vec2(radius, height)
+    df = min_(max_(d.x, d.y), radius * 1e-6) + max_(d, height * 1e-6).length()
+    bb = BoundBox(-radius, radius, -radius, radius, -height, height)
+    return Shape(df, bb)
+
+
+def union(a: Shape, b: Shape) -> Shape:
+    df = min_(a.tree, b.tree)
+    bb = BoundBox(
+        min(a.bounds.xmin, b.bounds.xmin),
+        max(a.bounds.xmax, b.bounds.xmax),
+        min(a.bounds.ymin, b.bounds.ymin),
+        max(a.bounds.ymax, b.bounds.ymax),
+        min(a.bounds.zmin, b.bounds.zmin),
+        max(a.bounds.zmax, b.bounds.zmax),
+    )
+    return Shape(df, bb)
+
+
+def intersection(a: Shape, b: Shape) -> Shape:
+    df = min_(a.tree, b.tree)
+    bb = BoundBox(
+        max(a.bounds.xmin, b.bounds.xmin),
+        min(a.bounds.xmax, b.bounds.xmax),
+        max(a.bounds.ymin, b.bounds.ymin),
+        min(a.bounds.ymax, b.bounds.ymax),
+        max(a.bounds.zmin, b.bounds.zmin),
+        min(a.bounds.zmax, b.bounds.zmax),
+    )
+    return Shape(df, bb)
+
+
+def difference(a: Shape, b: Shape) -> Shape:
+    df = max_(a.tree, -b.tree)
+    bb = a.bounds
+    return Shape(df, bb)
+
+
+def xor(a: Shape, b: Shape) -> Shape:
+    df = max_(min_(a.rtee, b.tree), -max_(a.tree, b.tree))
+    bb = BoundBox(
+        min(a.bounds.xmin, b.bounds.xmin),
+        max(a.bounds.xmax, b.bounds.xmax),
+        min(a.bounds.ymin, b.bounds.ymin),
+        max(a.bounds.ymax, b.bounds.ymax),
+        min(a.bounds.zmin, b.bounds.zmin),
+        max(a.bounds.zmax, b.bounds.zmax),
+    )
+    return Shape(df, bb)
+
+
+def move(shp: Shape, mx, my, mz) -> Shape:
+    """
+    Translate a shape by the given vector
+    """
+    mov = Vec3(mx, my, mz)
     return Shape(
-        shp.tree.remap_xyz(*(axes - mov)),
-        BoundBox(shp.boundbox._min + mov, shp.boundbox._max + mov),
+        shp.tree.remap_xyz(*(axes() - mov)),
+        BoundBox(
+            shp.bounds.xmin + mx,
+            shp.bounds.xmax + mx,
+            shp.bounds.ymin + my,
+            shp.bounds.ymax + my,
+            shp.bounds.zmin + mz,
+            shp.bounds.zmax + mz,
+        ),
+    )
+
+
+def expand(shp: Shape, amount: Real) -> Shape:
+    """
+    Expands a shape by the specified amount.
+
+    For exact distance fields, sharp corners become rounded.
+    For mitred distance fields, sharp corners are preserved.
+    """
+    return Shape(
+        shp.tree - amount,
+        BoundBox(
+            shp.bounds.xmin - amount,
+            shp.bounds.xmax + amount,
+            shp.bounds.ymin - amount,
+            shp.bounds.ymax + amount,
+            shp.bounds.zmin - amount,
+            shp.bounds.zmax + amount,
+        ),
     )

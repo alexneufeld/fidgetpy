@@ -198,6 +198,7 @@ name = "fidgetpy"
 version = "0.1.0"
 dependencies = [
  "fidget",
+ "nalgebra",
  "pyo3",
  "rayon",
 ]

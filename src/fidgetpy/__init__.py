@@ -88,6 +88,7 @@ __all__ = [
     "shapes",
     "VectorError",
     "UnaryVectorCreationError",
-    "CrossProductError," "VectorLengthMismatchError",
+    "CrossProductError",
+    "VectorLengthMismatchError",
     "SwizzleError",
 ]

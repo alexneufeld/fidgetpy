@@ -2,7 +2,9 @@ use fidget::{
     compiler::{SsaOp, SsaTape},
     context::{Context, Tree},
     mesh::{Mesh, Settings},
+    render::View3,
 };
+use nalgebra::base::Vector3;
 use pyo3::prelude::*;
 use pyo3::{exceptions::PyRuntimeError, IntoPyObjectExt};
 use std::{cmp::Ordering, collections::HashMap};
@@ -353,12 +355,20 @@ impl PyTree {
         }
         Ok(result)
     }
-    fn mesh(&self, this_depth: u8) -> Result<PyMesh, PyFidgetError> {
+    fn mesh(
+        &self,
+        depth: u8,
+        cx: f32,
+        cy: f32,
+        cz: f32,
+        region_size: f32,
+    ) -> Result<PyMesh, PyFidgetError> {
         let mut ctx = Context::new();
         let root = ctx.import(&self._val);
         let shape = fidget::jit::JitShape::new(&ctx, root)?;
         let settings = Settings {
-            depth: this_depth,
+            depth,
+            view: View3::from_center_and_scale(Vector3::new(cx, cy, cz), region_size),
             ..Default::default()
         };
         let octree = fidget::mesh::Octree::build(&shape, settings);
