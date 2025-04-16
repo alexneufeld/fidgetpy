@@ -1,5 +1,5 @@
 import pytest
-from fidgetpy import Vec2, Vec3, SwizzleError
+from fidgetpy.math import Vec2, Vec3, SwizzleError
 
 
 def test_operations():

@@ -1,9 +1,9 @@
 import math
 from numbers import Real
-from fidgetpy._core import Tree
-from .vec import Vec2, Vec3, axes, axes2d
-from .vmath import max_, min_
 from dataclasses import dataclass
+from fidgetpy._core import Tree
+from .math import Vec2, Vec3, axes, axes2d, max_, min_
+
 
 inf = float("inf")
 
@@ -310,3 +310,23 @@ def revolve_z(shp: Shape) -> Tree:
         shp.bounds.ymax,
     )
     return Shape(df, bb)
+
+
+__all__ = [
+    "BoundBox",
+    "Shape",
+    "sphere",
+    "circle",
+    "box",
+    "rectangle",
+    "torus",
+    "cylinder",
+    "union",
+    "intersection",
+    "difference",
+    "xor",
+    "move",
+    "expand",
+    "extrude_z",
+    "revolve_z",
+]
