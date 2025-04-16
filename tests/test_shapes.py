@@ -33,3 +33,20 @@ def test_cylinder():
     m = s.mesh(5)
     assert len(m.vertices) > 1000
     assert len(m.triangles) > 1000
+
+
+def test_revolve():
+    s = shapes.circle(1)
+    s = shapes.move(s, 2, 1, 0)
+    s = shapes.revolve_z(s)
+    m = s.mesh(5)
+    assert len(m.vertices) > 1000
+    assert len(m.triangles) > 1000
+
+
+def test_extrude():
+    s = shapes.circle(1)
+    s = shapes.extrude_z(s, 1.0)
+    m = s.mesh(5)
+    assert len(m.vertices) > 1000
+    assert len(m.triangles) > 1000

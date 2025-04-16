@@ -1,7 +1,7 @@
 import math
 from numbers import Real
 from fidgetpy._core import Tree
-from .vec import Vec2, Vec3, axes
+from .vec import Vec2, Vec3, axes, axes2d
 from .vmath import max_, min_
 from dataclasses import dataclass
 
@@ -89,6 +89,10 @@ def sphere(r) -> Shape:
     return Shape(axes().length() - r, BoundBox(-r, r, -r, r, -r, r))
 
 
+def circle(r) -> Shape:
+    return Shape(axes2d().length() - r, BoundBox(-r, r, -r, r, -inf, inf))
+
+
 def box(lx, ly, lz) -> Shape:
     """
     A rectangular box, centered at the origin.
@@ -100,6 +104,15 @@ def box(lx, ly, lz) -> Shape:
     q = abs(p) - Vec3(lx, ly, lz) / 2
     df = (max_(q, eps)).length() + min_(max_(q.x, max_(q.y, q.z)), eps)
     bb = BoundBox(-lx, lx, -ly, ly, -lz, lz)
+    return Shape(df, bb)
+
+
+def rectangle(lx, ly) -> Shape:
+    eps = min(lx, ly) * 1e-6
+    p = axes()
+    q = abs(p) - Vec2(lx, ly) / 2
+    df = (max_(q, eps)).length() + min_(max_(q.x, max_(q.y, q.z)), eps)
+    bb = BoundBox(-lx, lx, -ly, ly, -inf, inf)
     return Shape(df, bb)
 
 
@@ -212,3 +225,37 @@ def expand(shp: Shape, amount: Real) -> Shape:
             shp.bounds.zmax + amount,
         ),
     )
+
+
+def extrude_z(shp: Shape, height: Real) -> Shape:
+    eps = 1e-6 * height
+    t = shp.tree
+    x, y, z = axes()
+    w = Vec2(t, abs(z) - height)
+    df = min_(max_(w.x, w.y), eps) + max_(w, eps).length()
+    bb = BoundBox(
+        shp.bounds.xmin,
+        shp.bounds.xmax,
+        shp.bounds.ymin,
+        shp.bounds.ymax,
+        -height,
+        height,
+    )
+    return Shape(df, bb)
+
+
+def revolve_z(shp: Shape) -> Tree:
+    t = shp.tree
+    p = axes()
+    rotated_up = t.remap_xyz(p.x, p.z, p.y)
+    df = rotated_up.remap_xyz(p.xy.length(), p.y, p.z)
+    outer_radius = max(abs(shp.bounds.xmin), abs(shp.bounds.xmax))
+    bb = BoundBox(
+        -1 * outer_radius,
+        outer_radius,
+        -1 * outer_radius,
+        outer_radius,
+        shp.bounds.ymin,
+        shp.bounds.ymax,
+    )
+    return Shape(df, bb)
