@@ -1,95 +1,6 @@
-import math
 from numbers import Real
-from dataclasses import dataclass
-from fidgetpy._core import Tree
-from .math import Vec2, Vec3, axes, axes2d, max_, min_
-
-
-inf = float("inf")
-
-
-class ShapeBoundsWarning(RuntimeWarning):
-    """Warn the user when a shape with a non-finite
-    or otherwise messed up bounding box is rendered"""
-
-
-@dataclass(frozen=True)
-class BoundBox:
-    """
-    A rectangualr volume in 3D space, represented by the x,y,z
-    coordinates of its opposite corners.
-    """
-
-    xmin: Real
-    xmax: Real
-    ymin: Real
-    ymax: Real
-    zmin: Real
-    zmax: Real
-
-    @property
-    def xlength(self) -> Real:
-        return self.xmax - self.xmin
-
-    @property
-    def ylength(self) -> Real:
-        return self.ymax - self.ymin
-
-    @property
-    def zlength(self) -> Real:
-        return self.zmax - self.zmin
-
-    @property
-    def center(self) -> Vec3:
-        return (
-            Vec3(self.xmin, self.ymin, self.zmin)
-            + Vec3(self.xmax, self.ymax, self.zmax)
-        ) / 2
-
-    @property
-    def diagonal_length(self) -> Real:
-        return (
-            Vec3(self.xmax, self.ymax, self.zmax)
-            - Vec3(self.xmin, self.ymin, self.zmin)
-        ).length()
-
-
-@dataclass(frozen=True)
-class Shape:
-    """
-    A 2D or 3D solid shape, represented by an implicit mathematical
-    expression (implicit distance field). This class implements
-    semi-automatic tracking of its bounding box, enabling optimal
-    evaluation and meshing in most cases.
-    """
-
-    tree: Tree
-    bounds: BoundBox
-
-    def eval(self, x, y, z):
-        return self.tree.eval(x, y, z)
-
-    def mesh(self, depth):
-        # create an adjusted bounding box to compensate for infinite shapes
-        bb = BoundBox(
-            self.bounds.xmin if math.isfinite(self.bounds.xmin) else -1.0,
-            self.bounds.xmax if math.isfinite(self.bounds.xmax) else 1.0,
-            self.bounds.ymin if math.isfinite(self.bounds.ymin) else -1.0,
-            self.bounds.ymax if math.isfinite(self.bounds.ymax) else 1.0,
-            self.bounds.zmin if math.isfinite(self.bounds.zmin) else -1.0,
-            self.bounds.zmax if math.isfinite(self.bounds.zmax) else 1.0,
-        )
-        if bb != self.bounds:
-            raise ShapeBoundsWarning(
-                "Shape has at least one non-finite bounding box face, "
-                "mesh output may be truncated."
-                f" Original bounding box: {self.bounds}"
-            )
-        # rescale the shape so that it fits inside a bounding box of [-1, 1]
-        # on all axis
-        sf = 1.01 * max(bb.xlength, bb.ylength, bb.zlength)
-        mesh = self.tree.mesh(depth, *bb.center, sf)
-        return mesh
+from .types import Tree, Vec2, Vec3, Shape, BoundBox
+from .math import axes, axes2d, max_, min_, inf
 
 
 def sphere(r) -> Shape:
@@ -313,20 +224,18 @@ def revolve_z(shp: Shape) -> Tree:
 
 
 __all__ = [
-    "BoundBox",
-    "Shape",
-    "sphere",
-    "circle",
     "box",
-    "rectangle",
-    "torus",
+    "circle",
     "cylinder",
-    "union",
-    "intersection",
     "difference",
-    "xor",
-    "move",
     "expand",
     "extrude_z",
+    "intersection",
+    "move",
+    "rectangle",
     "revolve_z",
+    "sphere",
+    "torus",
+    "union",
+    "xor",
 ]

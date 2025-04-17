@@ -8,8 +8,6 @@ use fidget::{
 use nalgebra::base::Vector3;
 use pyo3::prelude::*;
 use pyo3::{exceptions::PyRuntimeError, types::PyDict, IntoPyObjectExt};
-use std::hash::{DefaultHasher, Hash, Hasher};
-use std::sync::Arc;
 use std::{cmp::Ordering, collections::HashMap};
 
 struct PyFidgetError(fidget::Error);
@@ -918,9 +916,6 @@ impl PyTree {
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTree>()?;
     m.add_class::<PyMesh>()?;
-    m.add_class::<PyMesh>()?;
-    // m.add_class::<PyUnaryOpcode>()?;
-    // m.add_class::<PyBinaryOpcode>()?;
-    m.add_class::<PyOpcode>()?;
+    m.add_class::<PyFidgetError>()?;
     Ok(())
 }

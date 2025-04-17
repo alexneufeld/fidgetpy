@@ -42,7 +42,7 @@ def linear_move(tool: fp.Tree, start: fp.Vec3, end: fp.Vec3) -> fp.Tree:
     pa = p - start
     ba = end - start
     h = fp.clamp(pa.dot(ba) / ba.dot(ba), 0.0, 1.0)
-    xp, yp, zp = pp = pa - ba * h
+    xp, yp, zp = pa - ba * h
     return tool.remap_xyz(xp, yp, zp)
     # return fp.max_(pp.xy.length() - 0.1, -pp.z)
 
