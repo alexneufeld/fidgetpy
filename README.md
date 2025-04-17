@@ -2,7 +2,17 @@
 
 Python bindings and high-level API for [Fidget](https://github.com/mkeeter/fidget).
 
-## Usage
+## Quickstart
+
+```  bash
+git clone git@github.com:alexneufeld/fidgetpy.git
+cd fidgetpy/
+uv run python ./examples/svg_fonts.py
+
+```
+
+
+## Basic Usage
 
 ``` python
 Python 3.11.2 (main, Nov 30 2024, 21:22:50) [GCC 12.2.0] on linux
@@ -34,4 +44,4 @@ BoundBox(xmin=-2.0, xmax=4.0, ymin=-1.0, ymax=5.0, zmin=2.0, zmax=4.0)
 
 ![](images/torus_mesh_screenshot.png)
 
-Refer to the [examples](examples/README.md) folder for additonal usage details.
+Refer to the [examples](examples/README.md) folder for additional usage details.
