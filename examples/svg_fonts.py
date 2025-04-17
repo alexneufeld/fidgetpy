@@ -1,15 +1,26 @@
 import os
 from xml.dom import minidom
-import fidgetpy as fp
+from fidgetpy.types import Tree, Vec2
+from fidgetpy.math import clamp, axes, min_, max_
 from typing import Self
+import functools
 
 
-def linesegment(a: fp.Vec2, b: fp.Vec2) -> fp.Tree:
-    x, y, _ = fp.axes()
-    p = fp.Vec2(x, y)
+def multiunion(*args):
+    return functools.reduce(min_, args)
+
+
+def extrude_z(tree, height):
+    z = Tree.z()
+    return max_(max_(-z, z - height), tree)
+
+
+def linesegment(a: Vec2, b: Vec2) -> Tree:
+    x, y, _ = axes()
+    p = Vec2(x, y)
     ba = b - a
     pa = p - a
-    h = fp.clamp(pa.dot(ba) / ba.dot(ba), 0.0, 1.0)
+    h = clamp(pa.dot(ba) / ba.dot(ba), 0.0, 1.0)
     return (pa - ba * h).length()
 
 
@@ -41,17 +52,17 @@ class HersheyFont:
     def __init__(self):
         pass
 
-    def render_string(self, s: str, em_height=1.0, stroke_width=0.05) -> fp.Tree:
+    def render_string(self, s: str, em_height=1.0, stroke_width=0.05) -> Tree:
         x = 0.0
         charshapes = []
         for c in s:
             nodes, advance = self.glyphs[c]
             strokes = [x - stroke_width for x in nodes]
-            x0, y0, z0 = fp.axes()
-            charshapes.append(fp.union(strokes).remap_xyz(x0 - x, y0, z0))
+            x0, y0, z0 = axes()
+            charshapes.append(multiunion(*strokes).remap_xyz(x0 - x, y0, z0))
             x += advance
         sf = self.fdata["units-per-em"] / em_height
-        return fp.union(charshapes).remap_xyz(*(fp.axes() * sf))
+        return multiunion(*charshapes).remap_xyz(*(axes() * sf))
 
     @staticmethod
     def from_file(fpath, ingest_scale_factor=1 / 1000) -> Self:
@@ -79,7 +90,7 @@ class HersheyFont:
             uc = glyph.getAttribute("unicode")
             paths = []
             advance = float(glyph.getAttribute("horiz-adv-x")) * ingest_scale_factor
-            current_pos = fp.Vec2(0, 0)
+            current_pos = Vec2(0, 0)
             gd = glyph.getAttribute("d")
             items = parse_d(gd)
             i = iter(items)
@@ -96,21 +107,21 @@ class HersheyFont:
                         if (not new_y) or (not new_y):
                             errmsg = "Ran out of d items while parsing M command"
                             raise RuntimeError()
-                        current_pos = fp.Vec2(float(new_x), float(new_y))
+                        current_pos = Vec2(float(new_x), float(new_y))
                     case "L":
                         new_x = next(i, None)
                         new_y = next(i, None)
                         if (not new_y) or (not new_y):
                             errmsg = "Ran out of d items while parsing L command"
                             raise RuntimeError(errmsg)
-                        new_pos = fp.Vec2(float(new_x), float(new_y))
+                        new_pos = Vec2(float(new_x), float(new_y))
                         paths.append(
                             linesegment(
-                                fp.Vec2(
+                                Vec2(
                                     current_pos.x * ingest_scale_factor,
                                     current_pos.y * ingest_scale_factor,
                                 ),
-                                fp.Vec2(
+                                Vec2(
                                     new_pos.x * ingest_scale_factor,
                                     new_pos.y * ingest_scale_factor,
                                 ),
@@ -135,7 +146,7 @@ class HersheyFont:
                             errmsg = "Ran out of d items while parsing C command"
                             raise RuntimeError(errmsg)
                         # print("skipping cubic bezier")
-                        new_pos = fp.Vec2(float(new_x), float(new_y))
+                        new_pos = Vec2(float(new_x), float(new_y))
                         current_pos = new_pos
                     case "Z":
                         pass  # this is incorrect
@@ -154,10 +165,10 @@ if __name__ == "__main__":
     HersheyGothEnglish = HersheyFont.from_file(
         os.path.join(FONT_DIR, "HersheyGothEnglish.svg")
     )
-    p = fp.axes()
-    shp = fp.extrude_z(HersheyGothEnglish.render_string("Hello!", 0.7, 0.01), 0.1)
+    p = axes()
+    shp = extrude_z(HersheyGothEnglish.render_string("Hello!", 0.7, 0.01), 0.1)
     shp = shp.remap_xyz(p.x + 1.0, p.y + 0.2, p.z)
     outfile = os.path.join(os.path.dirname(__file__), "out/svg_font_test.stl")
     os.makedirs(os.path.dirname(outfile), exist_ok=True)
     with open(outfile, "wb") as f:
-        f.write(shp.mesh(8).to_stl())
+        f.write(shp.mesh(8, 0, 0, 0, 1).to_stl())
