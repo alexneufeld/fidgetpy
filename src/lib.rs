@@ -6,23 +6,12 @@ use fidget::{
     var::Var,
 };
 use nalgebra::base::Vector3;
+use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::{exceptions::PyRuntimeError, types::PyDict, IntoPyObjectExt};
 use std::{cmp::Ordering, collections::HashMap};
 
-struct PyFidgetError(fidget::Error);
-
-impl From<PyFidgetError> for PyErr {
-    fn from(error: PyFidgetError) -> Self {
-        PyRuntimeError::new_err(error.0.to_string())
-    }
-}
-
-impl From<fidget::Error> for PyFidgetError {
-    fn from(other: fidget::Error) -> Self {
-        Self(other)
-    }
-}
+pyo3::create_exception!(_core, FidgetError, PyException);
 
 #[derive(Clone)]
 #[pyclass(name = "Tree")]
@@ -91,14 +80,17 @@ impl PyTree {
         ctx.import(&self._val);
         ctx.dot()
     }
-    fn eval(&self, x: f64, y: f64, z: f64) -> Result<f64, PyFidgetError> {
+    fn eval(&self, x: f64, y: f64, z: f64) -> PyResult<f64> {
         // slow point-wise evaluation
         // useful for debugging and testing
         let mut ctx = Context::new();
         let root = ctx.import(&self._val);
-        Ok(ctx.eval_xyz(root, x, y, z)?)
+        match ctx.eval_xyz(root, x, y, z) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(FidgetError::new_err(e.to_string())),
+        }
     }
-    fn eval_map(&self, vars: Bound<PyDict>) -> Result<f64, PyErr> {
+    fn eval_map(&self, vars: Bound<PyDict>) -> PyResult<f64> {
         let mut ctx = Context::new();
         let root = ctx.import(&self._val);
         let mut varmap: HashMap<Var, f64> = HashMap::new();
@@ -106,7 +98,7 @@ impl PyTree {
             let key_tree: PyTree = match key.extract() {
                 Ok(k) => k,
                 Err(..) => {
-                    return Err(PyRuntimeError::new_err(
+                    return Err(FidgetError::new_err(
                         "Could not recover useable Tree Operation from value map",
                     ))
                 }
@@ -115,7 +107,7 @@ impl PyTree {
             let val_float: f64 = match value.extract() {
                 Ok(v) => v,
                 Err(..) => {
-                    return Err(PyRuntimeError::new_err(
+                    return Err(FidgetError::new_err(
                         "Could not recover useable Tree Operation from value map",
                     ))
                 }
@@ -124,7 +116,7 @@ impl PyTree {
             let this_var = match key_tree._val.to_owned().var() {
                 Some(v) => v,
                 None => {
-                    return Err(PyRuntimeError::new_err(
+                    return Err(FidgetError::new_err(
                         "Could not recover useable Tree Operation from value map",
                     ))
                 }
@@ -133,16 +125,20 @@ impl PyTree {
         }
         match ctx.eval(root, &varmap) {
             Ok(v) => Ok(v),
-            Err(..) => Err(PyRuntimeError::new_err(
-                "Could not recover useable Tree Operation from value map",
-            )),
+            Err(e) => Err(FidgetError::new_err(e.to_string())),
         }
     }
     #[staticmethod]
-    fn from_vm(src: &str) -> Result<Self, PyFidgetError> {
-        let (ctx, root) = Context::from_text(src.as_bytes())?;
+    fn from_vm(src: &str) -> PyResult<Self> {
+        let (ctx, root) = match Context::from_text(src.as_bytes()) {
+            Ok(t) => t,
+            Err(e) => return Err(FidgetError::new_err(e.to_string())),
+        };
         Ok(PyTree {
-            _val: ctx.export(root)?,
+            _val: match ctx.export(root) {
+                Ok(v) => v,
+                Err(e) => return Err(FidgetError::new_err(e.to_string())),
+            },
         })
     }
     fn to_vm(&self) -> PyResult<String> {
@@ -150,7 +146,7 @@ impl PyTree {
         let root = ctx.import(&self._val);
         let (ssatape, varmap) = match SsaTape::new(&ctx, &[root]) {
             Ok(x) => x,
-            Err(_) => return Err(PyRuntimeError::new_err("Error while building SSA tape")),
+            Err(e) => return Err(FidgetError::new_err(e.to_string())),
         };
         let mut result = String::new();
         let mut addr: u32 = 0;
@@ -171,7 +167,7 @@ impl PyTree {
                 SsaOp::Output(..) => {}
                 SsaOp::Input(out, i) => {
                     let varname = if !axismap.contains_key(&(i as usize)) {
-                        return Err(PyRuntimeError::new_err(format!(
+                        return Err(FidgetError::new_err(format!(
                             "Error while building SSA tape {i}"
                         )));
                     } else {
@@ -395,17 +391,13 @@ impl PyTree {
         }
         Ok(result)
     }
-    fn mesh(
-        &self,
-        depth: u8,
-        cx: f32,
-        cy: f32,
-        cz: f32,
-        region_size: f32,
-    ) -> Result<PyMesh, PyFidgetError> {
+    fn mesh(&self, depth: u8, cx: f32, cy: f32, cz: f32, region_size: f32) -> PyResult<PyMesh> {
         let mut ctx = Context::new();
         let root = ctx.import(&self._val);
-        let shape = fidget::jit::JitShape::new(&ctx, root)?;
+        let shape = match fidget::jit::JitShape::new(&ctx, root) {
+            Ok(v) => v,
+            Err(e) => return Err(FidgetError::new_err(e.to_string())),
+        };
         let settings = Settings {
             depth,
             view: View3::from_center_and_scale(Vector3::new(cx, cy, cz), region_size),
@@ -426,12 +418,7 @@ impl PyTree {
         ctx.import(&self._val);
         ctx.len()
     }
-    fn remap_xyz(
-        &self,
-        new_x: &PyTree,
-        new_y: &PyTree,
-        new_z: &PyTree,
-    ) -> Result<Self, PyFidgetError> {
+    fn remap_xyz(&self, new_x: &PyTree, new_y: &PyTree, new_z: &PyTree) -> PyResult<Self> {
         // don't lazily evaluate remappings to prevent unexpected results due to nested remap calls
         let remapped_tree = self._val.to_owned().remap_xyz(
             new_x._val.to_owned(),
@@ -441,10 +428,13 @@ impl PyTree {
         let mut ctx = Context::new();
         let root = ctx.import(&remapped_tree);
         Ok(PyTree {
-            _val: ctx.export(root)?,
+            _val: match ctx.export(root) {
+                Ok(v) => v,
+                Err(e) => return Err(FidgetError::new_err(e.to_string())),
+            },
         })
     }
-    fn deriv(&self, v: Self, n: i32) -> Result<PyTree, PyErr> {
+    fn deriv(&self, v: Self, n: i32) -> PyResult<PyTree> {
         if n < 1 {
             return Err(PyRuntimeError::new_err(
                 "cannot take derivatives of negative order",
@@ -913,9 +903,9 @@ impl PyTree {
 /// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
 /// import the module.
 #[pymodule]
-fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _core(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTree>()?;
     m.add_class::<PyMesh>()?;
-    m.add_class::<PyFidgetError>()?;
+    m.add("FidgetError", py.get_type::<FidgetError>())?;
     Ok(())
 }

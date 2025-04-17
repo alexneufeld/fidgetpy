@@ -1,3 +1,6 @@
+from fidgetpy._core import FidgetError
+
+
 class ShapeBoundsWarning(RuntimeWarning):
     """Warn the user when a shape with a non-finite
     or otherwise messed up bounding box is rendered"""
@@ -24,6 +27,7 @@ class SwizzleError(VectorError):
 
 
 __all__ = [
+    "FidgetError",
     "ShapeBoundsWarning",
     "VectorError",
     "UnaryVectorCreationError",
