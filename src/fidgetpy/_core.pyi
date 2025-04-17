@@ -17,7 +17,7 @@ class Mesh:
         ...
 
 class Tree:
-    """A tree structure of arbitrary mathmatical operations."""
+    """A tree structure of arbitrary mathematical operations."""
 
     @staticmethod
     def x() -> Self:
